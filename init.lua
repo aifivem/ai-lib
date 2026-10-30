@@ -30,7 +30,8 @@ end
 ---@field onServerCallback fun(name: string, handler: (fun(...: any): any)) client
 ---@field notify fun(...: any) client `(text, kind?, duration?)`; server `(source, text, kind?, duration?)`
 ---@field progress fun(options: { label: string, duration: integer, anim?: { dict: string, clip: string, flag?: integer }, allowVehicle?: boolean }): boolean client
----@field menu { show: (fun(request: table): string?), input: (fun(request: table): table?) } client
+---@field menu { show: (fun(request: table, listeners?: table): string?), input: (fun(request: table): table?), itemPicker: (fun(request: { title: string }, onPick: fun(name: string, count: integer))) } client
+---@field itemPicker fun(request: { title: string }, onPick: fun(name: string, count: integer)) client, admin tools: waits until closed
 ---@field input fun(request: table): table? client
 ---@field showPrompt fun(id: string, text: string) client
 ---@field hidePrompt fun(id: string) client
@@ -55,6 +56,7 @@ end
 ---@field isAdmin fun(source: integer, ace?: string): boolean server
 ---@field controls { disable: (fun(reason: string, controls: integer[], group?: integer)), enable: (fun(reason: string)) } client
 ---@field hud { hide: (fun(reason: string)), show: (fun(reason: string)), visible: (fun(): boolean) } client
+---@field keyHints { show: (fun(id: string, hint: { label: string, keybind?: string, key?: string, icon?: string })), hide: (fun(id: string)) } client
 ---@field gestures { isHandsUp: (fun(): boolean), isPointing: (fun(): boolean), provider: (fun(): string?) } client
 ---@field requestModel fun(model: string|integer, timeout?: integer): integer? client
 ---@field requestAnimDict fun(dict: string, timeout?: integer): string? client

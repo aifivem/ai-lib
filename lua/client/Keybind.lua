@@ -17,6 +17,8 @@ end)
 ---@field defaultMapper? string `keyboard` (default), `MOUSE_BUTTON`, `PAD_DIGITALBUTTON`
 ---@field allowInPauseMenu? boolean
 ---@field disabled? boolean
+---@field hint? 'foot'|'vehicle'|'always' HUDs list the key in their key hints then (the owner can change it in the panel)
+---@field icon? string Font Awesome solid icon name next to the hint
 ---@field onPressed? fun()
 ---@field onReleased? fun()
 
@@ -53,6 +55,8 @@ function Keybind.new(options)
             description = options.description,
             defaultKey = options.defaultKey or '',
             mapper = options.defaultMapper or 'keyboard',
+            hint = options.hint,
+            icon = options.icon,
         })
     end
     -- ai-core answers within one server round trip; never leave a key unbound.

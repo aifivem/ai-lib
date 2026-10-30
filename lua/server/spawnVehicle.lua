@@ -48,6 +48,19 @@ end
 ---@field persistent? boolean stays when its owner leaves (default true)
 ---@field bags? table<string, any> replicated state bag values
 
+local LETTERS = 'ABCDEFGHJKLMNPRSTUVWXYZ'
+
+---A plate like the game's own: two digits, three letters, three digits.
+---@return string
+local function randomPlate()
+    local function letter()
+        local i = math.random(#LETTERS)
+        return LETTERS:sub(i, i)
+    end
+    return ('%d%d%s%s%s%d%d%d'):format(math.random(0, 9), math.random(0, 9), letter(), letter(), letter(),
+        math.random(0, 9), math.random(0, 9), math.random(0, 9))
+end
+
 ---Creates a networked vehicle and sets it up: plate, fuel, look, lock, bucket, keys, driver and passengers. Returns
 ---the entity, or nil when the model does not exist or creation failed. Call from a thread.
 ---@param options AiLibSpawnVehicleOptions
@@ -59,7 +72,10 @@ return function(options)
     local vehicle = CreateVehicleServerSetter(GetHashKey(options.model), kind, c.x, c.y, c.z, c.w or c.heading or 0.0)
     if not aiLib.waitFor(function() return DoesEntityExist(vehicle) or nil end, 5000) then return nil end
     if options.persistent ~= false then SetEntityOrphanMode(vehicle, 2) end
-    if options.plate then SetVehicleNumberPlateText(vehicle, options.plate:sub(1, 8)) end
+    -- The server reads the plate only after the owner client's first sync: always set one, so keys never go to an
+    -- empty plate.
+    local plate = (options.plate or randomPlate()):sub(1, 8)
+    SetVehicleNumberPlateText(vehicle, plate)
     if options.bucket then SetEntityRoutingBucket(vehicle, options.bucket) end
     if options.locked then SetVehicleDoorsLocked(vehicle, 2) end
     local state = Entity(vehicle).state
@@ -67,7 +83,15 @@ return function(options)
     if options.props then state:set('ai:props', options.props, true) end
     if options.setup then state:set('ai:setup', options.setup, true) end
     for key, value in pairs(options.bags or {}) do state:set(key, value, true) end
-    if options.keysTo then aiLib.vehicleKeys.give(options.keysTo, vehicle, options.purpose) end
+    if options.keysTo then
+        local trimmed = plate:match('^%s*(.-)%s*$')
+        local synced = aiLib.waitFor(function()
+            return (not DoesEntityExist(vehicle) or GetVehicleNumberPlateText(vehicle):match('^%s*(.-)%s*$') == trimmed)
+                or nil
+        end, 3000)
+        aiLib.vehicleKeys.give(options.keysTo, synced and DoesEntityExist(vehicle) and vehicle or trimmed,
+            options.purpose)
+    end
     if options.driver then seatPlayer(vehicle, options.driver, -1) end
     for _, rider in ipairs(options.seats or {}) do seatPlayer(vehicle, rider.source, rider.seat) end
     return vehicle

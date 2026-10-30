@@ -106,6 +106,21 @@ function replyError(reply, fallback) {
 }
 // ../../../packages/lib/src/shared/vec.ts
 const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
+function headingTo(from, to) {
+	return (-(Math.atan2(to.x - from.x, to.y - from.y) * 180 / Math.PI) + 360) % 360;
+}
+// ../../../packages/lib/src/shared/format.ts
+function round(value, decimals = 0) {
+	let power = 10 ** decimals;
+	return Math.round(value * power) / power;
+}
+function groupDigits(value, separator = ",") {
+	let [whole = "", fraction] = String(value).split("."), grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, separator);
+	return fraction === void 0 ? grouped : `${grouped}.${fraction}`;
+}
+function stripGameText(text) {
+	return text == null ? "" : String(text).replace(/<[^>]*>/g, "").replace(/~[\w]+~/g, "").replace(/&nbsp;/g, " ").replace(/\s\s+/g, " ").trim();
+}
 // ../../../packages/lib/src/shared/zone.ts
 function zoneContains(shape, x, y, z) {
 	switch (shape.type) {
@@ -400,6 +415,8 @@ var shared_exports = __exportAll({
 	distance: () => distance,
 	fail: () => fail,
 	formatText: () => formatText,
+	groupDigits: () => groupDigits,
+	headingTo: () => headingTo,
 	int: () => int,
 	isActionOk: () => isActionOk,
 	isRecord: () => isRecord,
@@ -417,9 +434,11 @@ var shared_exports = __exportAll({
 	readText: () => readText,
 	record: () => record,
 	replyError: () => replyError,
+	round: () => round,
 	sleep: () => sleep,
 	spec: () => spec,
 	str: () => str,
+	stripGameText: () => stripGameText,
 	toVehicleProps: () => toVehicleProps,
 	toVehicleSetup: () => toVehicleSetup,
 	vec4: () => vec4,
@@ -545,6 +564,8 @@ const CORE = {
 	dutyChangedEvent: "ai-core:dutyChanged",
 	gangsChangedEvent: "ai-core:gangsChanged",
 	activeGangChangedEvent: "ai-core:activeGangChanged",
+	metaChangedEvent: "ai-core:metaChanged",
+	definitionsChangedEvent: "ai-core:definitionsChanged",
 	characterScreenEvent: "ai-core:characterScreen",
 	inventoryChangedEvent: "ai-core:inventoryChanged",
 	itemUsedEvent: "ai-core:itemUsed",
@@ -556,6 +577,9 @@ const CORE = {
 	clientPromptPressedEvent: "ai-core:client:promptPressed",
 	clientCacheEvent: "ai-core:client:cache",
 	clientHudVisibleEvent: "ai-core:client:hudVisible",
+	clientWorldSyncEvent: "ai-core:client:worldSync",
+	clientCancelProgressEvent: "ai-core:client:cancelProgress",
+	clientDefinitionsEvent: "ai-core:client:definitions",
 	vehicleTypeCallback: "ai-core:vehicleType",
 	interactionStateKey: "ai:interaction",
 	charactersCallback: "ai-core:characters",

@@ -38,6 +38,21 @@ end
 ---@field cache AiLibCache client
 ---@field Keybind AiLibKeybind client
 ---@field Points AiLibPoints client
+---@field ModelPoints table client, internal (used by `Points:addModel`)
+---@field Zones AiLibZones client
+---@field LocalPed AiLibLocalPed client
+---@field Blips AiLibBlips client (`Blips.create(options)` for a single blip)
+---@field player table client: `coords`, `heading`, `distanceTo`, `freeze`, `teleport`, `playAnim`, `stopAnim`
+---@field fadeOut fun(ms?: integer) client
+---@field nearestVehicle fun(metres: number, options?: { networked?: boolean, notOwn?: boolean }): integer client
+---@field playerData { get: (fun(key: string): any), onChange: (fun(key: string, handler: fun(value: any))) } client
+---@field onServerEvent fun(name: string, handler: (fun(...: any))) client
+---@field onClientEvent fun(name: string, handler: (fun(source: integer, ...: any)), options?: table) server
+---@field aiLog fun(channel: string, message: string, options?: table) server
+---@field online table server: `character`, `jobs`, `dutyJob`, `sources`
+---@field nearestVehicleTo fun(source: integer, metres: number): integer server
+---@field playersNearEntity fun(entity: integer, radius: number): integer[] server
+---@field isAdmin fun(source: integer, ace?: string): boolean server
 ---@field controls { disable: (fun(reason: string, controls: integer[], group?: integer)), enable: (fun(reason: string)) } client
 ---@field hud { hide: (fun(reason: string)), show: (fun(reason: string)), visible: (fun(): boolean) } client
 ---@field gestures { isHandsUp: (fun(): boolean), isPointing: (fun(): boolean), provider: (fun(): string?) } client

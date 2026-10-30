@@ -35,7 +35,8 @@ end
 ---@field onPressed fun()
 ---@field onEnter? fun()
 ---@field onExit? fun()
----@field blip? { sprite: integer, color: integer, scale?: number, label?: string }
+---@field blip? { sprite: integer, color: integer, scale?: number, label?: string, coords?: vector3 } a map blip (its label = the place's name)
+---@field ped? { model: string, coords?: vector4, scenario?: string, anim?: { dict: string, clip: string }, distance?: number } an NPC at the point; target options go on it
 
 ---@class AiLibPoint
 ---@field promptId string
@@ -44,6 +45,7 @@ end
 ---@field shown string?
 ---@field zone any
 ---@field blip integer?
+---@field ped AiLibLocalPed?
 local Point = {}
 Point.__index = Point
 
@@ -96,6 +98,7 @@ end
 ---@class AiLibPoints
 ---@field private prefix string
 ---@field private points table<string, AiLibPoint>
+---@field private models table<string, table>
 local Points = {}
 Points.__index = Points
 
@@ -103,7 +106,7 @@ Points.__index = Points
 ---@return AiLibPoints
 function Points.new()
     nextGroup = nextGroup + 1
-    local self = setmetatable({ prefix = ('pt%d:'):format(nextGroup), points = {} }, Points)
+    local self = setmetatable({ prefix = ('pt%d:'):format(nextGroup), points = {}, models = {} }, Points)
     groups[#groups + 1] = self
     return self
 end
@@ -122,18 +125,32 @@ function Points:add(id, options)
     end
     local b = options.blip
     if b then
-        local blip = AddBlipForCoord(options.coords.x, options.coords.y, options.coords.z)
-        SetBlipSprite(blip, b.sprite)
-        SetBlipColour(blip, b.color)
-        SetBlipScale(blip, b.scale or 0.8)
-        SetBlipAsShortRange(blip, true)
-        if b.label then
-            AddTextEntry('AI_LIB_BLIP', '~a~')
-            BeginTextCommandSetBlipName('AI_LIB_BLIP')
-            AddTextComponentSubstringPlayerName(b.label)
-            EndTextCommandSetBlipName(blip)
-        end
-        point.blip = blip
+        point.blip = aiLib.Blips.create({
+            coords = b.coords or options.coords,
+            sprite = b.sprite,
+            color = b.color,
+            scale = b.scale,
+            label = b.label,
+        })
+    end
+    local ped = options.ped
+    if ped then
+        local c = options.coords
+        point.ped = aiLib.LocalPed.new({
+            model = ped.model,
+            coords = ped.coords or { x = c.x, y = c.y, z = c.z, w = 0.0 },
+            scenario = ped.scenario,
+            anim = ped.anim,
+            distance = ped.distance,
+            onSpawn = function(entity)
+                if style() == 'target' and not options.promptOnly then
+                    exports[TARGET]:addLocalEntity(entity, point:targetOption())
+                end
+            end,
+            onDespawn = function(entity)
+                if GetResourceState(TARGET) == 'started' then exports[TARGET]:removeLocalEntity(entity, point.promptId) end
+            end,
+        })
     end
     self:attach(point, style())
 end
@@ -147,10 +164,26 @@ function Points:remove(id)
     self:detach(point)
     if point.shown then exports['ai-core']:HidePrompt(point.promptId) end
     if point.blip then RemoveBlip(point.blip) end
+    if point.ped then point.ped:remove() end
+    local model = self.models[id]
+    if model then
+        self.models[id] = nil
+        aiLib.ModelPoints.remove(model)
+    end
 end
 
 function Points:clear()
     for id in pairs(self.points) do self:remove(id) end
+    for id in pairs(self.models) do self:remove(id) end
+end
+
+---A point on every world object of some models (ATMs, chairs; `vehicles = true` for vehicle models such as boats):
+---a target option on the models, or a prompt near the closest one. `canShow` and `onPressed` get the entity.
+---@param id string
+---@param options { models: (string|integer)[], vehicles?: boolean, label: string, icon?: string, radius?: number, canShow?: fun(entity: integer): boolean, onPressed: fun(entity: integer) }
+function Points:addModel(id, options)
+    self:remove(id)
+    self.models[id] = aiLib.ModelPoints.add(self.prefix .. id, options, style())
 end
 
 ---Reads `canShow` and function labels again (call when what they read changed: job, duty, vehicle).
@@ -168,6 +201,10 @@ end
 ---@private
 function Points:attach(point, mode)
     if mode ~= 'target' or point.options.promptOnly then return end
+    if point.ped then
+        if point.ped.entity ~= 0 then exports[TARGET]:addLocalEntity(point.ped.entity, point:targetOption()) end
+        return
+    end
     point.zone = exports[TARGET]:addSphereZone({
         coords = point.options.coords,
         radius = point.options.targetRadius or 1,
@@ -177,8 +214,13 @@ end
 
 ---@private
 function Points:detach(point)
-    if point.zone and GetResourceState(TARGET) == 'started' then exports[TARGET]:removeZone(point.zone) end
+    if GetResourceState(TARGET) ~= 'started' then
+        point.zone = nil
+        return
+    end
+    if point.zone then exports[TARGET]:removeZone(point.zone) end
     point.zone = nil
+    if point.ped and point.ped.entity ~= 0 then exports[TARGET]:removeLocalEntity(point.ped.entity, point.promptId) end
 end
 
 local function restyleAll()
@@ -189,6 +231,7 @@ local function restyleAll()
             group:attach(point, mode)
             point:sync(mode)
         end
+        for _, model in pairs(group.models) do aiLib.ModelPoints.restyle(model, mode) end
     end
 end
 
@@ -219,7 +262,7 @@ end
 AddEventHandler('ai-core:client:promptPressed', function(owner, id)
     if owner ~= resource then return end
     local point = byPrompt[id]
-    if point then point:press() end
+    if point then point:press() else aiLib.ModelPoints.press(id) end
 end)
 AddStateBagChangeHandler('ai:interaction', 'global', function() SetTimeout(0, restyleAll) end)
 AddEventHandler('onClientResourceStart', function(name)

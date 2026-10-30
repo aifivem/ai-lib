@@ -38,7 +38,7 @@ return function(name, handler, options)
         end
         w.count = w.count + 1
         local refused = w.count > rate.count
-            or (options.ace and not IsPlayerAceAllowed(src, options.ace))
+            or (options.ace and not IsPlayerAceAllowed(tostring(src), options.ace))
             or (options.lock and lock[src])
         if refused then return TriggerClientEvent(reply, src, id, false, nil) end
         if options.lock then lock[src] = true end

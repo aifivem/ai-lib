@@ -22,9 +22,9 @@ end
 local function allowed(src, command, name)
     if src <= 0 or not command.aces then return true end
     for _, ace in ipairs(command.aces) do
-        if IsPlayerAceAllowed(src, ace) then return true end
+        if IsPlayerAceAllowed(tostring(src), ace) then return true end
     end
-    return IsPlayerAceAllowed(src, 'command.' .. name)
+    return IsPlayerAceAllowed(tostring(src), 'command.' .. name)
 end
 
 ---Sends `src` the suggestions they gained and removes the ones they lost.

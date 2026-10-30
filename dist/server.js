@@ -519,7 +519,7 @@ const CORE = {
 	clientPlayerLoadedEvent: "ai-core:client:playerLoaded",
 	clientPlayerUnloadedEvent: "ai-core:client:playerUnloaded",
 	clientCharacterPortraitEvent: "ai-core:client:characterPortrait",
-	clientCharacterLookEvent: "ai-core:client:characterLook",
+	characterLooksEvent: "ai-core:client:characterLooks",
 	clientPromptPressedEvent: "ai-core:client:promptPressed",
 	clientCacheEvent: "ai-core:client:cache",
 	clientHudVisibleEvent: "ai-core:client:hudVisible",
@@ -548,7 +548,18 @@ const CORE = {
 	props: "ai:props",
 	setup: "ai:setup",
 	fuel: "fuel"
-}, named = new Set();
+};
+// ../../../packages/shared/src/appearance.ts
+function toCharacterAppearance(value) {
+	if (typeof value != "object" || !value || Array.isArray(value)) return null;
+	let { model, data } = value;
+	return Number.isInteger(model) && model !== 0 && data != null ? {
+		model,
+		data
+	} : null;
+}
+// ../../../packages/lib/src/fivem/exports.ts
+const named = new Set();
 function registerExport(name, handler) {
 	named.add(name), globalThis.exports(name, handler);
 	let first = name.charAt(0), twin = (first === first.toUpperCase() ? first.toLowerCase() : first.toUpperCase()) + name.slice(1);
@@ -611,7 +622,7 @@ function isNear(source, point, metres) {
 	return dx * dx + dy * dy + dz * dz <= metres * metres;
 }
 // ../../../packages/lib/src/server/gate.ts
-const core$14 = resourceExport(CORE.resource), log$5 = createLogger(GetCurrentResourceName()), isAdmin = (ace = ADMIN.ace) => (source) => !!IsPlayerAceAllowed(String(source), ace) || `not allowed (${ace})`, hasCharacter = () => (source) => core$14.GetCharacter(source) !== null || "no character loaded", near = (point, metres) => (source) => {
+const core$15 = resourceExport(CORE.resource), log$5 = createLogger(GetCurrentResourceName()), isAdmin = (ace = ADMIN.ace) => (source) => !!IsPlayerAceAllowed(String(source), ace) || `not allowed (${ace})`, hasCharacter = () => (source) => core$15.GetCharacter(source) !== null || "no character loaded", near = (point, metres) => (source) => {
 	let target = typeof point == "function" ? point(source) : point;
 	return target ? isNear(source, target, metres) || `too far (${metres} m)` : "no target point";
 }, gates = new Set();
@@ -737,7 +748,7 @@ function toPatch(value) {
 		default: return null;
 	}
 }
-const clone = (value) => value === void 0 ? value : JSON.parse(JSON.stringify(value)), core$13 = resourceExport(CORE.resource), ERR = {
+const clone = (value) => value === void 0 ? value : JSON.parse(JSON.stringify(value)), core$14 = resourceExport(CORE.resource), ERR = {
 	type: "ADMIN_ERR_TYPE",
 	range: "ADMIN_ERR_RANGE",
 	length: "ADMIN_ERR_LENGTH",
@@ -751,7 +762,7 @@ const clone = (value) => value === void 0 ? value : JSON.parse(JSON.stringify(va
 		if (cached && Date.now() - cached.at < 2e3) return cached.values.size > 0 ? cached.values : null;
 		let list = [];
 		try {
-			list = core$13.GetLookupValues(source);
+			list = core$14.GetLookupValues(source);
 		} catch {}
 		let values = new Set(Array.isArray(list) ? list.filter((v) => typeof v == "string") : []);
 		return this.lists.set(source, {
@@ -954,7 +965,7 @@ function writeSchema(resource, name, text, log) {
 	(0, node_fs_promises.mkdir)(dir, { recursive: !0 }).then(() => (0, node_fs_promises.writeFile)(`${dir}/${name}.schema.json`, text, "utf8")).catch((error) => log.error(`writing ${resource}/${path} failed`, error));
 }
 // ../../../packages/lib/src/server/admin/panel.ts
-const core$12 = resourceExport(CORE.resource), DEFAULT_KEY = "^[a-z0-9_]{2,32}$";
+const core$13 = resourceExport(CORE.resource), DEFAULT_KEY = "^[a-z0-9_]{2,32}$";
 function imported(spec, value) {
 	let base = clone(spec.newRecord ?? {}), out = {};
 	for (let name of Object.keys(spec.sections)) {
@@ -978,7 +989,7 @@ var AdminPanel = class {
 	constructor(schema) {
 		this.schema = schema;
 		for (let [name, spec] of Object.entries(schema.files)) this.load(name, spec);
-		registerExport("AdminPanelSnapshot", () => this.snapshot()), registerExport("AdminPanelApply", (admin, patch) => this.apply(admin, patch)), onClientCallback(ADMIN.worldChangesCallback(this.resource), () => Object.fromEntries(this.worldChanges)), setImmediate(() => core$12.RegisterAdminPanel(this.resource));
+		registerExport("AdminPanelSnapshot", () => this.snapshot()), registerExport("AdminPanelApply", (admin, patch) => this.apply(admin, patch)), onClientCallback(ADMIN.worldChangesCallback(this.resource), () => Object.fromEntries(this.worldChanges)), setImmediate(() => core$13.RegisterAdminPanel(this.resource));
 	}
 	get(file) {
 		return this.data.get(file) ?? {};
@@ -1112,7 +1123,7 @@ var AdminPanel = class {
 		let spec = this.schema.files[file], data = this.get(file), value = key === void 0 ? data : data[key] ?? null;
 		this.dataFiles.get(file)?.write(data), this.views.changed(file, key, value);
 		for (let handler of this.handlers.get(file) ?? []) handler(key, value);
-		if (core$12.AdminPanelChanged({
+		if (core$13.AdminPanelChanged({
 			resource: this.resource,
 			file,
 			key,
@@ -1150,19 +1161,19 @@ function notify(source, text, kind = "info", duration) {
 	emitNet(CORE.clientNotifyEvent, source, notification);
 }
 // ../../../packages/lib/src/server/inventory.ts
-const core$11 = resourceExport(CORE.resource), inventory = {
-	addItem: (inv, item, count = 1, metadata, slot) => core$11.AddItem(inv, item, count, metadata, slot),
-	removeItem: (inv, item, count = 1, metadata, slot) => core$11.RemoveItem(inv, item, count, metadata, slot),
-	getItemCount: (inv, item, metadata) => core$11.GetItemCount(inv, item, metadata),
-	hasItem: (inv, item, count = 1) => core$11.HasItem(inv, item, count),
-	canCarryItem: (inv, item, count = 1, metadata) => core$11.CanCarryItem(inv, item, count, metadata),
-	getItems: (inv) => core$11.GetItems(inv),
-	clearInventory: (inv) => core$11.ClearInventory(inv),
-	registerStash: (name, label, slots, maxWeight, jobs = []) => core$11.RegisterStash(name, label, slots, maxWeight, jobs),
-	openInventory: (source, inv) => core$11.OpenInventory(source, inv),
-	registerUsableItem: (name, handler) => core$11.RegisterUsableItem(name, handler),
-	getItemDefinition: (name) => core$11.GetItemDefinition(name)
-}, core$10 = resourceExport(CORE.resource);
+const core$12 = resourceExport(CORE.resource), inventory = {
+	addItem: (inv, item, count = 1, metadata, slot) => core$12.AddItem(inv, item, count, metadata, slot),
+	removeItem: (inv, item, count = 1, metadata, slot) => core$12.RemoveItem(inv, item, count, metadata, slot),
+	getItemCount: (inv, item, metadata) => core$12.GetItemCount(inv, item, metadata),
+	hasItem: (inv, item, count = 1) => core$12.HasItem(inv, item, count),
+	canCarryItem: (inv, item, count = 1, metadata) => core$12.CanCarryItem(inv, item, count, metadata),
+	getItems: (inv) => core$12.GetItems(inv),
+	clearInventory: (inv) => core$12.ClearInventory(inv),
+	registerStash: (name, label, slots, maxWeight, jobs = []) => core$12.RegisterStash(name, label, slots, maxWeight, jobs),
+	openInventory: (source, inv) => core$12.OpenInventory(source, inv),
+	registerUsableItem: (name, handler) => core$12.RegisterUsableItem(name, handler),
+	getItemDefinition: (name) => core$12.GetItemDefinition(name)
+}, core$11 = resourceExport(CORE.resource);
 var OnlinePlayers = class {
 	players = new Map();
 	onDuty = new Map();
@@ -1171,7 +1182,7 @@ var OnlinePlayers = class {
 		if (this.started) return;
 		this.started = !0;
 		let load = (source, character) => {
-			this.put(source, character, (core$10.GetJobs(source) ?? []).map((m) => m.job), (core$10.GetGangs(source) ?? []).map((m) => m.gang)), this.setDuty(source, core$10.GetDutyJob(source));
+			this.put(source, character, (core$11.GetJobs(source) ?? []).map((m) => m.job), (core$11.GetGangs(source) ?? []).map((m) => m.gang)), this.setDuty(source, core$11.GetDutyJob(source));
 		};
 		on(CORE.playerLoadedEvent, load), on(CORE.playerUnloadedEvent, (source) => this.drop(source)), on(CORE.jobsChangedEvent, (source, jobs) => {
 			let player = this.players.get(source);
@@ -1180,8 +1191,8 @@ var OnlinePlayers = class {
 			let player = this.players.get(source);
 			player && (player.gangs = gangs.map((m) => m.gang));
 		}), on(CORE.dutyChangedEvent, (source, job) => this.setDuty(source, job));
-		for (let source of core$10.GetLoadedSources()) {
-			let character = core$10.GetCharacter(source);
+		for (let source of core$11.GetLoadedSources()) {
+			let character = core$11.GetCharacter(source);
 			character && load(source, character);
 		}
 	}
@@ -1224,10 +1235,10 @@ var OnlinePlayers = class {
 		return this.start(), this.onDuty.get(job) ?? EMPTY;
 	}
 };
-const EMPTY = new Set(), online = new OnlinePlayers(), core$9 = resourceExport(CORE.resource), vehicleKeys = {
-	give: (source, vehicle, purpose = "temporary") => core$9.GiveVehicleKeys(source, vehicle, purpose),
-	remove: (source, vehicle) => core$9.RemoveVehicleKeys(source, vehicle),
-	has: (source, vehicle) => core$9.HasVehicleKeys(source, vehicle)
+const EMPTY = new Set(), online = new OnlinePlayers(), core$10 = resourceExport(CORE.resource), vehicleKeys = {
+	give: (source, vehicle, purpose = "temporary") => core$10.GiveVehicleKeys(source, vehicle, purpose),
+	remove: (source, vehicle) => core$10.RemoveVehicleKeys(source, vehicle),
+	has: (source, vehicle) => core$10.HasVehicleKeys(source, vehicle)
 }, TYPES = new Set([
 	"automobile",
 	"bike",
@@ -1252,8 +1263,14 @@ async function seatPlayer(vehicle, source, seat) {
 		SetPedIntoVehicle(ped, vehicle, seat);
 	}, 2e3, 150).catch(() => !1) : !1;
 }
-function randomPlate() {
-	let digit = () => String(Math.floor(Math.random() * 10)), letter = () => "ABCDEFGHJKLMNPRSTUVWXYZ"[Math.floor(Math.random() * 23)] ?? "A";
+function randomPlate(prefix) {
+	let digit = () => String(Math.floor(Math.random() * 10));
+	if (prefix !== void 0) {
+		let plate = prefix.slice(0, 8);
+		for (; plate.length < 8;) plate += digit();
+		return plate;
+	}
+	let letter = () => "ABCDEFGHJKLMNPRSTUVWXYZ"[Math.floor(Math.random() * 23)] ?? "A";
 	return `${digit()}${digit()}${letter()}${letter()}${letter()}${digit()}${digit()}${digit()}`;
 }
 async function spawnVehicle(options) {
@@ -1276,6 +1293,14 @@ async function spawnVehicle(options) {
 		seat: -1
 	}], ...options.seats ?? []];
 	return await Promise.all(riders.map((r) => seatPlayer(vehicle, r.source, r.seat))), vehicle;
+}
+function nearestVehicleAt(point, metres, filter) {
+	let best = 0, bestDistance = metres;
+	for (let vehicle of GetAllVehicles()) {
+		let [vx = 0, vy = 0, vz = 0] = GetEntityCoords(vehicle), d = Math.hypot(vx - point.x, vy - point.y, vz - point.z);
+		d < bestDistance && (!filter || filter(vehicle)) && ([best, bestDistance] = [vehicle, d]);
+	}
+	return best;
 }
 function nearestVehicleTo(source, metres, filter) {
 	let ped = GetPlayerPed(String(source)), own = GetVehiclePedIsIn(ped, !1);
@@ -1301,7 +1326,7 @@ function vehicleNearPlayer(source, netId, options = {}) {
 	return Math.hypot(vx - px, vy - py, vz - pz) <= (options.metres ?? 5) ? vehicle : 0;
 }
 // ../../../packages/lib/src/server/proximity.ts
-const core$8 = resourceExport(CORE.resource);
+const core$9 = resourceExport(CORE.resource);
 function within(point, radius, candidates) {
 	let out = [];
 	for (let source of candidates) {
@@ -1311,16 +1336,16 @@ function within(point, radius, candidates) {
 	return out;
 }
 function playersNear(source, radius) {
-	return within(coordsOf(source), radius, [source, ...core$8.GetPlayersInScope(source)]);
+	return within(coordsOf(source), radius, [source, ...core$9.GetPlayersInScope(source)]);
 }
 function playersNearEntity(entity, radius) {
 	if (!DoesEntityExist(entity)) return [];
 	let owner = NetworkGetEntityOwner(entity);
-	return owner <= 0 ? [] : within(entityCoords(entity), radius, [owner, ...core$8.GetPlayersInScope(owner)]);
+	return owner <= 0 ? [] : within(entityCoords(entity), radius, [owner, ...core$9.GetPlayersInScope(owner)]);
 }
 function nearestPlayerTo(source, metres, filter) {
 	let from = coordsOf(source), best = null, bestDistance = metres;
-	for (let other of core$8.GetPlayersInScope(source)) {
+	for (let other of core$9.GetPlayersInScope(source)) {
 		if (other === source) continue;
 		let p = coordsOf(other), d = Math.hypot(p.x - from.x, p.y - from.y, p.z - from.z);
 		d > bestDistance || filter && !filter(other) || (best = other, bestDistance = d);
@@ -15966,28 +15991,37 @@ var GlobalGroup$1 = class extends Mirror {
 	}
 };
 // ../../../packages/lib/src/server/world.ts
-const core$7 = resourceExport(CORE.resource), world = {
-	getWeather: () => core$7.GetWeather(),
-	setWeather: (type) => core$7.SetWeather(type),
-	getTime: () => core$7.GetTime(),
-	setTime: (hour, minute = 0) => core$7.SetTime(hour, minute),
-	setBlackout: (on) => core$7.SetBlackout(on),
-	freezeTime: (on) => core$7.FreezeTime(on)
-}, core$6 = resourceExport(CORE.resource), phone = {
-	number: (source) => core$6.GetPhoneNumber(source),
-	sourceOf: (number) => core$6.GetSourceByPhone(number),
-	hasPhone: (source) => core$6.HasPhone(source),
-	mail: (to, mail) => core$6.SendPhoneMail(to, mail),
-	message: (from, to, text) => core$6.SendPhoneMessage(from, to, text),
-	notify: (source, notification) => core$6.PhoneNotify(source, notification)
-}, core$5 = resourceExport(CORE.resource), dispatch = { alert: (alert) => core$5.SendDispatchAlert(alert) }, core$4 = resourceExport(CORE.resource), money = { transfer: (from, to, amount, reason, fee) => core$4.TransferMoney(from, to, amount, reason, fee) }, core$3 = resourceExport(CORE.resource), buckets = {
-	acquire: (tag) => core$3.AcquireBucket(tag),
-	release: (id) => core$3.ReleaseBucket(id)
-}, core$2 = resourceExport(CORE.resource), medical = {
-	revive: (source) => core$2.RevivePlayer(source),
-	heal: (source) => core$2.HealPlayer(source),
-	isDead: (source) => core$2.IsPlayerDead(source),
-	provider: () => core$2.GetMedicalSystem()
+const core$8 = resourceExport(CORE.resource), world = {
+	getWeather: () => core$8.GetWeather(),
+	setWeather: (type) => core$8.SetWeather(type),
+	getTime: () => core$8.GetTime(),
+	setTime: (hour, minute = 0) => core$8.SetTime(hour, minute),
+	setBlackout: (on) => core$8.SetBlackout(on),
+	freezeTime: (on) => core$8.FreezeTime(on)
+}, core$7 = resourceExport(CORE.resource), phone = {
+	number: (source) => core$7.GetPhoneNumber(source),
+	sourceOf: (number) => core$7.GetSourceByPhone(number),
+	hasPhone: (source) => core$7.HasPhone(source),
+	mail: (to, mail) => core$7.SendPhoneMail(to, mail),
+	message: (from, to, text) => core$7.SendPhoneMessage(from, to, text),
+	notify: (source, notification) => core$7.PhoneNotify(source, notification)
+}, core$6 = resourceExport(CORE.resource), dispatch = { alert: (alert) => core$6.SendDispatchAlert(alert) }, core$5 = resourceExport(CORE.resource), money = { transfer: (from, to, amount, reason, fee) => core$5.TransferMoney(from, to, amount, reason, fee) }, core$4 = resourceExport(CORE.resource), buckets = {
+	acquire: (tag) => core$4.AcquireBucket(tag),
+	release: (id) => core$4.ReleaseBucket(id)
+}, core$3 = resourceExport(CORE.resource), medical = {
+	revive: (source) => core$3.RevivePlayer(source),
+	heal: (source) => core$3.HealPlayer(source),
+	isDead: (source) => core$3.IsPlayerDead(source),
+	provider: () => core$3.GetMedicalSystem()
+}, core$2 = resourceExport(CORE.resource), appearance = {
+	get: (charId) => new Promise((resolve) => {
+		try {
+			core$2.GetCharacterAppearance(charId, (look) => resolve(toCharacterAppearance(look)));
+		} catch {
+			resolve(null);
+		}
+	}),
+	provider: () => core$2.GetAppearanceSystem()
 }, core$1 = resourceExport(CORE.resource), characters = { setOfflinePosition: (charId, position) => core$1.SetOfflinePosition(charId, position) }, core = resourceExport(CORE.resource), isPrimeTime = (job) => core.IsPrimeTime(job);
 // ../../../packages/lib/src/server/index.ts
 var server_exports = __exportAll({
@@ -16008,6 +16042,7 @@ var server_exports = __exportAll({
 	addCommand: () => addCommand,
 	aiLog: () => aiLog,
 	aiLogChannels: () => aiLogChannels,
+	appearance: () => appearance,
 	buckets: () => buckets,
 	callExport: () => callExport,
 	characters: () => characters,
@@ -16029,6 +16064,7 @@ var server_exports = __exportAll({
 	money: () => money,
 	near: () => near,
 	nearestPlayerTo: () => nearestPlayerTo,
+	nearestVehicleAt: () => nearestVehicleAt,
 	nearestVehicleTo: () => nearestVehicleTo,
 	notify: () => notify,
 	onCharacter: () => onCharacter,
@@ -16041,6 +16077,7 @@ var server_exports = __exportAll({
 	playersNear: () => playersNear,
 	playersNearEntity: () => playersNearEntity,
 	provideExport: () => provideExport,
+	randomPlate: () => randomPlate,
 	registerExport: () => registerExport,
 	resourceExport: () => resourceExport,
 	sendPlayerData: () => sendPlayerData,

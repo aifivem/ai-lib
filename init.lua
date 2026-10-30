@@ -80,6 +80,7 @@ end
 ---@field phone table server
 ---@field dispatch { alert: (fun(alert: AiLibDispatchAlert): boolean) } server: police alerts through ai-core's alert system
 ---@field world table client `pauseSync` / `resumeSync`; server time and weather
+---@field appearance table client `apply(ped, look)`, `read(ped)`; server `get(charId)` (waits), `provider()`: looks through ai-core's appearance layer
 ---@diagnostic disable-next-line: lowercase-global
 aiLib = setmetatable({ side = side }, {
     __index = function(self, key)

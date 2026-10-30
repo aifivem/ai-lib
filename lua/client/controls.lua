@@ -1,4 +1,4 @@
--- Disabled controls of this resource: one per-frame thread for every reason, running only while any reason holds.
+-- Disabled controls of this resource: one per-frame scheduler job for every reason, running only while any reason holds.
 local sets = {}
 local flat = {}
 ---Reasons that disable every control, each with the controls it keeps.
@@ -6,7 +6,16 @@ local all = {}
 local allCount = 0
 ---Controls every `disableAll` reason keeps (and no `disable` reason takes).
 local kept = {}
-local running = false
+
+local frame = aiLib.every(0, function()
+    if allCount > 0 then
+        DisableAllControlActions(0)
+        DisableAllControlActions(1)
+        DisableAllControlActions(2)
+        for i = 1, #kept do EnableControlAction(0, kept[i], true) end
+    end
+    for i = 1, #flat, 2 do DisableControlAction(flat[i], flat[i + 1], true) end
+end, { active = false, name = 'controls' })
 
 ---@param list integer[]
 ---@param control integer
@@ -39,21 +48,7 @@ local function rebuild()
         for _, except in pairs(all) do everyone = everyone and has(except, control) end
         if everyone then kept[#kept + 1] = control end
     end
-    if (#flat == 0 and allCount == 0) or running then return end
-    running = true
-    CreateThread(function()
-        while #flat > 0 or allCount > 0 do
-            if allCount > 0 then
-                DisableAllControlActions(0)
-                DisableAllControlActions(1)
-                DisableAllControlActions(2)
-                for i = 1, #kept do EnableControlAction(0, kept[i], true) end
-            end
-            for i = 1, #flat, 2 do DisableControlAction(flat[i], flat[i + 1], true) end
-            Wait(0)
-        end
-        running = false
-    end)
+    frame:set(#flat > 0 or allCount > 0)
 end
 
 return {

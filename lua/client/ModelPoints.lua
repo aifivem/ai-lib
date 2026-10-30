@@ -5,10 +5,31 @@
 
 local TARGET = 'ox_target'
 local SCAN_MS = 500
+-- Up to this many models a point asks GTA for the closest object of each; more models use the object index (one
+-- closest-object query per model and scan costs milliseconds with hundreds of models).
+local DIRECT_MODELS = 6
+local INDEX_CHUNK = 300
+local index = { candidates = {}, pool = {}, next = 1, found = {} }
+
+---Walks a chunk of the object pool and keeps the objects of the wanted models; a full walk replaces the candidates.
+---@param wanted table<integer, boolean>
+local function advanceIndex(wanted)
+    if index.next > #index.pool then
+        index.candidates = index.found
+        index.found = {}
+        index.pool = GetGamePool('CObject')
+        index.next = 1
+    end
+    local last = math.min(#index.pool, index.next + INDEX_CHUNK - 1)
+    for i = index.next, last do
+        local entity = index.pool[i]
+        if entity and wanted[GetEntityModel(entity)] then index.found[#index.found + 1] = entity end
+    end
+    index.next = last + 1
+end
 ---@type table<table, boolean>
 local scanning = {}
 local byPrompt = {}
-local running = false
 local busy = false
 
 ---@param point table
@@ -54,6 +75,16 @@ local function nearest(point, x, y, z)
         end
         return best
     end
+    if #point.hashes > DIRECT_MODELS then
+        local best, bestDist = 0, radius
+        for _, entity in ipairs(index.candidates) do
+            if DoesEntityExist(entity) and point.hashSet[GetEntityModel(entity)] then
+                local d = #(GetEntityCoords(entity) - vector3(x, y, z))
+                if d < bestDist then best, bestDist = entity, d end
+            end
+        end
+        return best
+    end
     for _, hash in ipairs(point.hashes) do
         local found = GetClosestObjectOfType(x, y, z, radius, hash, false, false, false)
         if found ~= 0 then return found end
@@ -61,18 +92,39 @@ local function nearest(point, x, y, z)
     return 0
 end
 
+-- While the player stands still (and stays in or out of a vehicle) a scan is skipped, at most IDLE_SCANS in a row.
+local IDLE_SCANS = 6
+local lastPos, lastInVehicle, idle = vector3(0, 0, 0), false, IDLE_SCANS
+
 local function scan()
-    while next(scanning) do
-        local x, y, z = table.unpack(GetEntityCoords(aiLib.cache.ped))
-        for point in pairs(scanning) do
-            local found = nearest(point, x, y, z)
+    local pos = GetEntityCoords(aiLib.cache.ped)
+    local inVehicle = aiLib.cache.vehicle ~= false
+    idle = idle + 1
+    if inVehicle == lastInVehicle and #(pos - lastPos) < 1.0 and idle < IDLE_SCANS then return end
+    lastPos, lastInVehicle, idle = pos, inVehicle, 0
+    local wanted, any = {}, false
+    for point in pairs(scanning) do
+        local skip = inVehicle and not point.options.vehicles and not point.options.inVehicle
+        if not skip and not point.options.vehicles and #point.hashes > DIRECT_MODELS then
+            for hash in pairs(point.hashSet) do wanted[hash] = true end
+            any = true
+        end
+    end
+    if any then advanceIndex(wanted) end
+    for point in pairs(scanning) do
+        if inVehicle and not point.options.vehicles and not point.options.inVehicle then
+            point.entity = 0
+            show(point, nil)
+        else
+            local found = nearest(point, pos.x, pos.y, pos.z)
             point.entity = found
             show(point, found ~= 0 and allowed(point, found) and point.options.label or nil)
         end
-        Wait(SCAN_MS)
     end
-    running = false
 end
+
+-- One scan job for the resource, two times a second, only while model points in prompt mode exist.
+local scanner = aiLib.every(SCAN_MS, scan, { active = false, name = 'modelPoints' })
 
 ---@param point table
 ---@param mode 'prompt'|'target'
@@ -95,9 +147,9 @@ local function attach(point, mode)
         return
     end
     scanning[point] = true
-    if not running then
-        running = true
-        CreateThread(scan)
+    if not scanner.running then
+        idle = IDLE_SCANS
+        scanner:set(true)
     end
 end
 
@@ -112,6 +164,7 @@ local function detach(point)
     end
     point.attached = false
     scanning[point] = nil
+    if not next(scanning) then scanner:set(false) end
     show(point, nil)
     point.entity = 0
 end

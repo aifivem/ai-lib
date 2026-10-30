@@ -8,8 +8,8 @@ local groups = {}
 local byPrompt = {}
 local nextGroup = 0
 local busy = false
-local watching = false
-local watch
+---@type AiLibJob
+local watcher
 
 ---@return 'prompt'|'target'
 local function style()
@@ -119,10 +119,7 @@ function Points:add(id, options)
     local point = setmetatable({ promptId = self.prefix .. id, options = options, inside = false }, Point)
     self.points[id] = point
     byPrompt[point.promptId] = point
-    if not watching then
-        watching = true
-        CreateThread(watch)
-    end
+    watcher:set(true)
     local b = options.blip
     if b then
         point.blip = aiLib.Blips.create({
@@ -180,7 +177,7 @@ end
 ---A point on every world object of some models (ATMs, chairs; `vehicles = true` for vehicle models such as boats):
 ---a target option on the models, or a prompt near the closest one. `canShow` and `onPressed` get the entity.
 ---@param id string
----@param options { models: (string|integer)[], vehicles?: boolean, label: string, icon?: string, radius?: number, canShow?: fun(entity: integer): boolean, onPressed: fun(entity: integer) }
+---@param options { models: (string|integer)[], vehicles?: boolean, inVehicle?: boolean, label: string, icon?: string, radius?: number, canShow?: fun(entity: integer): boolean, onPressed: fun(entity: integer) }
 function Points:addModel(id, options)
     self:remove(id)
     self.models[id] = aiLib.ModelPoints.add(self.prefix .. id, options, style())
@@ -245,29 +242,26 @@ local function restyleAll()
     end
 end
 
--- One check for every point of this resource, two times a second, started with the first point; enters and exits
--- run whatever the style.
-watch = function()
-    while true do
-        Wait(CHECK_MS)
-        local any = false
-        local x, y, z = table.unpack(GetEntityCoords(aiLib.cache.ped))
-        local mode = style()
-        for _, group in ipairs(groups) do
-            for _, point in pairs(group.points) do
-                any = true
-                local inside = point:contains(x, y, z)
-                if inside ~= point.inside then
-                    point.inside = inside
-                    local hook = inside and point.options.onEnter or point.options.onExit
-                    if hook then pcall(hook) end
-                end
-                if point.inside or point.shown then point:sync(mode) end
+-- One check for every point of this resource, two times a second (a scheduler job running while points exist);
+-- enters and exits run whatever the style.
+watcher = aiLib.every(CHECK_MS, function()
+    local any = false
+    local x, y, z = table.unpack(GetEntityCoords(aiLib.cache.ped))
+    local mode = style()
+    for _, group in ipairs(groups) do
+        for _, point in pairs(group.points) do
+            any = true
+            local inside = point:contains(x, y, z)
+            if inside ~= point.inside then
+                point.inside = inside
+                local hook = inside and point.options.onEnter or point.options.onExit
+                if hook then pcall(hook) end
             end
+            if point.inside or point.shown then point:sync(mode) end
         end
-        if not any then Wait(1000) end
     end
-end
+    if not any then watcher:set(false) end
+end, { active = false, name = 'points' })
 
 AddEventHandler('ai-core:client:promptPressed', function(owner, id)
     if owner ~= resource then return end

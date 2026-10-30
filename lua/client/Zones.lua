@@ -1,5 +1,6 @@
--- Areas of a resource with enter / exit callbacks, like the TypeScript lib's `Zones`: one thread checks every zone
--- of the resource, each at its own interval (default 500 ms, at least 50), started with the first zone.
+-- Areas of a resource with enter / exit callbacks, like the TypeScript lib's `Zones`: one scheduler job checks every
+-- zone of the resource at the shortest interval any zone asks for, each zone at its own interval (default 500 ms, at
+-- least 50); the job runs only while zones exist.
 
 ---@alias AiLibZoneShape
 ---| { type: 'sphere', center: vector3|{x: number, y: number, z: number}, radius: number }
@@ -13,7 +14,6 @@
 ---@field onExit? fun()
 
 local groups = {}
-local watching = false
 
 ---@param shape AiLibZoneShape
 ---@param x number
@@ -40,30 +40,43 @@ local function contains(shape, x, y, z)
     return inside
 end
 
-local function watch()
-    while true do
-        local now = GetGameTimer()
-        local x, y, z = table.unpack(GetEntityCoords(aiLib.cache.ped))
-        local soonest = 1000
-        for _, group in ipairs(groups) do
-            for _, zone in pairs(group.zones) do
-                if now >= zone.next then
-                    zone.next = now + zone.interval
-                    local inside = contains(zone.shape, x, y, z)
-                    if inside ~= zone.inside then
-                        zone.inside = inside
-                        local hook = inside and zone.onEnter or zone.onExit
-                        if hook then
-                            local ok, err = pcall(hook)
-                            if not ok then print(('^1[%s] zone callback failed: %s^0'):format(GetCurrentResourceName(), err)) end
-                        end
+local function check()
+    local now = GetGameTimer()
+    local x, y, z = table.unpack(GetEntityCoords(aiLib.cache.ped))
+    for _, group in ipairs(groups) do
+        for _, zone in pairs(group.zones) do
+            if now >= zone.next then
+                zone.next = now + zone.interval
+                local inside = contains(zone.shape, x, y, z)
+                if inside ~= zone.inside then
+                    zone.inside = inside
+                    local hook = inside and zone.onEnter or zone.onExit
+                    if hook then
+                        local ok, err = pcall(hook)
+                        if not ok then print(('^1[%s] zone callback failed: %s^0'):format(GetCurrentResourceName(), err)) end
                     end
                 end
-                soonest = math.min(soonest, zone.next - now)
             end
         end
-        Wait(math.max(50, soonest))
     end
+end
+
+---Zones per interval, so the shortest one is found without walking every zone.
+---@type table<integer, integer>
+local intervals = {}
+---@type AiLibJob?
+local job
+local period = 0
+
+local function schedule()
+    local shortest = 0
+    for interval in pairs(intervals) do
+        if shortest == 0 or interval < shortest then shortest = interval end
+    end
+    if shortest == period then return end
+    period = shortest
+    if job then job:stop() end
+    job = shortest > 0 and aiLib.every(shortest, check, { name = 'zones' }) or nil
 end
 
 ---@class AiLibZones
@@ -92,10 +105,9 @@ function Zones:add(id, options)
         inside = false,
         next = 0,
     }
-    if not watching then
-        watching = true
-        CreateThread(watch)
-    end
+    local interval = self.zones[id].interval
+    intervals[interval] = (intervals[interval] or 0) + 1
+    schedule()
 end
 
 ---@param id string
@@ -103,6 +115,9 @@ function Zones:remove(id)
     local zone = self.zones[id]
     if not zone then return end
     self.zones[id] = nil
+    local left = intervals[zone.interval] - 1
+    intervals[zone.interval] = left > 0 and left or nil
+    schedule()
     if zone.inside and zone.onExit then pcall(zone.onExit) end
 end
 

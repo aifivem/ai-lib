@@ -24,6 +24,7 @@ end
 ---@class AiLib
 ---@field side 'client'|'server'
 ---@field waitFor fun(check: (fun(): any), timeout?: integer|false, interval?: integer): any
+---@field every fun(ms: integer, fn: fun(), options?: { active?: boolean, name?: string }): AiLibJob periodic work (0 = every frame) on the resource's one scheduler thread; `job:set(active)`, `job:stop()`, `job.running`
 ---@field formatText fun(text: string, ...: string|number): string
 ---@field fail fun(error: string): { ok: false, error: string } server actions: a refusal with a lang key
 ---@field locale fun(resource?: string): (fun(key: string, ...: string|number): string), (table<string, string>)
@@ -49,7 +50,9 @@ end
 ---@field nearestPlayer fun(metres: number, options?: { from?: vector3, filter?: fun(serverId: integer, ped: integer): boolean }): integer? client: closest other player's server id
 ---@field onShot fun(handler: fun(weapon: integer)) client: the frame the local ped fires (per-frame only while armed)
 ---@field fadeOut fun(ms?: integer) client
----@field nearestVehicle fun(metres: number, options?: { networked?: boolean, notOwn?: boolean }): integer client
+---@field fadeIn fun(ms?: integer) client
+---@field waitForEntity fun(netId: integer, timeout?: integer): integer client: the entity once it exists here, 0 after the timeout
+---@field nearestVehicle fun(metres: number, options?: { networked?: boolean, notOwn?: boolean, filter?: fun(vehicle: integer): boolean }): integer client
 ---@field playerData { get: (fun(key: string): any), onChange: (fun(key: string, handler: fun(value: any))) } client
 ---@field onServerEvent fun(name: string, handler: (fun(...: any))) client
 ---@field onClientEvent fun(name: string, handler: (fun(source: integer, ...: any)), options?: table) server

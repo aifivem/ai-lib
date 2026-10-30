@@ -1,4 +1,4 @@
----Fades the screen out and waits until it is black (call from a thread). `DoScreenFadeIn(ms)` brings it back.
+---Fades the screen out and waits until it is black (call from a thread). `aiLib.fadeIn(ms)` brings it back.
 ---@param ms? integer default 300
 return function(ms)
     ms = ms or 300

@@ -2,7 +2,7 @@
 local core = exports['ai-core']
 return {
     ---@param src integer
-    ---@return table? character { id, citizenid, firstname, lastname, birthdate, sex }
+    ---@return table? character { id, citizenid, firstname, lastname, birthdate, sex, nationality }
     character = function(src) return core:GetCharacter(src) end,
     ---@param src integer
     ---@return table[] jobs { job, grade, ... }

@@ -58,6 +58,7 @@ end
 ---@field hud { hide: (fun(reason: string)), show: (fun(reason: string)), visible: (fun(): boolean) } client
 ---@field keyHints { show: (fun(id: string, hint: { label: string, keybind?: string, key?: string, icon?: string })), hide: (fun(id: string)) } client
 ---@field gestures { isHandsUp: (fun(): boolean), isPointing: (fun(): boolean), provider: (fun(): string?) } client
+---@field radial { add: (fun(item: AiLibRadialItem)), remove: (fun(id: string)), refresh: fun() } client: wheel items through ai-core
 ---@field requestModel fun(model: string|integer, timeout?: integer): integer? client
 ---@field requestAnimDict fun(dict: string, timeout?: integer): string? client
 ---@field requestPtfxAsset fun(asset: string, timeout?: integer): string? client
@@ -69,6 +70,7 @@ end
 ---@field inventory table client `openInventory`, `hasItem`; server the item calls through ai-core
 ---@field vehicleKeys { give: (fun(source: integer, vehicle: integer|string, purpose?: string)), remove: (fun(source: integer, vehicle: integer|string)), has: (fun(source: integer, vehicle: integer|string): boolean) } server
 ---@field phone table server
+---@field dispatch { alert: (fun(alert: AiLibDispatchAlert): boolean) } server: police alerts through ai-core's alert system
 ---@field world table client `pauseSync` / `resumeSync`; server time and weather
 ---@diagnostic disable-next-line: lowercase-global
 aiLib = setmetatable({ side = side }, {

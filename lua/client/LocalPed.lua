@@ -11,6 +11,8 @@ local nextId = 0
 ---@field scenario? string
 ---@field anim? { dict: string, clip: string }
 ---@field distance? number spawned within this many metres (default 50)
+---@field attach? { entity: integer|(fun(): integer), bone?: integer, offset?: vector3|{x: number, y: number, z: number}, rotation?: vector3|{x: number, y: number, z: number} } attached at a bone (not frozen); a function is read at each spawn
+---@field seat? { vehicle: integer|(fun(): integer), seat: integer } sitting in a vehicle seat (-1 driver); a function is read at each spawn
 ---@field onSpawn? fun(ped: integer)
 ---@field onDespawn? fun(ped: integer)
 
@@ -56,7 +58,7 @@ function LocalPed:spawn()
     local c = o.coords
     local ped = CreatePed(4, hash, c.x, c.y, o.ground == false and c.z or c.z - 1.0, c.w or c.heading or 0.0, false, false)
     SetModelAsNoLongerNeeded(hash)
-    FreezeEntityPosition(ped, true)
+    if not self:place(ped) then FreezeEntityPosition(ped, true) end
     SetEntityInvincible(ped, true)
     SetBlockingOfNonTemporaryEvents(ped, true)
     SetPedCanRagdoll(ped, false)
@@ -67,6 +69,28 @@ function LocalPed:spawn()
     end
     self.entity = ped
     if o.onSpawn then pcall(o.onSpawn, ped) end
+end
+
+---Puts the new ped into its seat or attaches it; false when it stands free (no target entity right now).
+---@private
+---@param ped integer
+---@return boolean
+function LocalPed:place(ped)
+    local o = self.options
+    local function read(e) if type(e) == 'function' then return e() end return e end
+    if o.seat then
+        local vehicle = read(o.seat.vehicle)
+        if not vehicle or vehicle == 0 or not DoesEntityExist(vehicle) then return false end
+        SetPedIntoVehicle(ped, vehicle, o.seat.seat)
+        return true
+    end
+    if not o.attach then return false end
+    local entity = read(o.attach.entity)
+    if not entity or entity == 0 or not DoesEntityExist(entity) then return false end
+    local off = o.attach.offset or { x = 0.0, y = 0.0, z = 0.0 }
+    local rot = o.attach.rotation or { x = 0.0, y = 0.0, z = 0.0 }
+    AttachEntityToEntity(ped, entity, o.attach.bone or 0, off.x, off.y, off.z, rot.x, rot.y, rot.z, false, false, false, false, 2, true)
+    return true
 end
 
 ---@private

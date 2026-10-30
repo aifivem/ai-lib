@@ -47,7 +47,7 @@ local function nearest(point, x, y, z)
     if point.options.vehicles then
         local best, bestDist = 0, radius
         for _, vehicle in ipairs(GetGamePool('CVehicle')) do
-            if point.hashSet[GetEntityModel(vehicle)] then
+            if (point.global and NetworkGetEntityIsNetworked(vehicle)) or point.hashSet[GetEntityModel(vehicle)] then
                 local d = #(GetEntityCoords(vehicle) - vector3(x, y, z))
                 if d < bestDist then best, bestDist = vehicle, d end
             end
@@ -78,14 +78,19 @@ end
 ---@param mode 'prompt'|'target'
 local function attach(point, mode)
     if mode == 'target' then
-        exports[TARGET]:addModel(point.options.models, { {
+        local option = {
             name = point.promptId,
             label = point.options.label,
             icon = point.options.icon,
             distance = point.options.radius or 1.5,
             canInteract = function(entity) return allowed(point, entity) end,
             onSelect = function(data) run(point, type(data) == 'table' and data.entity or 0) end,
-        } })
+        }
+        if point.global then
+            exports[TARGET]:addGlobalVehicle({ option })
+        else
+            exports[TARGET]:addModel(point.options.models, { option })
+        end
         point.attached = true
         return
     end
@@ -99,7 +104,11 @@ end
 ---@param point table
 local function detach(point)
     if point.attached and GetResourceState(TARGET) == 'started' then
-        exports[TARGET]:removeModel(point.options.models, point.promptId)
+        if point.global then
+            exports[TARGET]:removeGlobalVehicle(point.promptId)
+        else
+            exports[TARGET]:removeModel(point.options.models, point.promptId)
+        end
     end
     point.attached = false
     scanning[point] = nil
@@ -120,7 +129,9 @@ function ModelPoints.add(promptId, options, mode)
         hashes[i] = hash
         hashSet[hash] = true
     end
-    local point = { promptId = promptId, options = options, hashes = hashes, hashSet = hashSet, entity = 0 }
+    -- No models on a vehicle point: every networked vehicle (`Points:addVehicle`).
+    local global = options.vehicles == true and #options.models == 0
+    local point = { promptId = promptId, options = options, hashes = hashes, hashSet = hashSet, entity = 0, global = global }
     byPrompt[promptId] = point
     attach(point, mode)
     return point

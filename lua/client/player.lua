@@ -18,10 +18,26 @@ end
 ---@param frozen boolean
 function player.freeze(frozen) FreezeEntityPosition(PlayerPedId(), frozen) end
 
+---Streams the area by standing the (frozen) entity at rising heights until the game knows the ground; nil if never.
+---@param entity integer
+---@param x number
+---@param y number
+---@return number?
+local function findGround(entity, x, y)
+    for height = 0, 1000, 25 do
+        SetEntityCoordsNoOffset(entity, x, y, height + 0.0, false, false, false)
+        RequestCollisionAtCoord(x, y, height + 0.0)
+        Wait(50)
+        local found, groundZ = GetGroundZFor_3dCoord(x, y, height + 0.0, false)
+        if found then return groundZ end
+    end
+end
+
 ---Moves the player (and their vehicle with `keepVehicle`) behind a fade, waiting for the collision there. `ground`
----(default true) puts the feet on `to.z` (panel points). Call from a thread.
----@param to vector3|{x: number, y: number, z: number}
----@param options? { heading?: number, ground?: boolean, fade?: boolean, keepVehicle?: boolean }
+---(default true) puts the feet on `to.z` (panel points); `ground = 'find'` or a missing `z` searches the ground under
+---x / y (map waypoint). Call from a thread.
+---@param to vector3|{x: number, y: number, z?: number}
+---@param options? { heading?: number, ground?: boolean|'find', fade?: boolean, keepVehicle?: boolean }
 function player.teleport(to, options)
     options = options or {}
     local fade = options.fade ~= false
@@ -29,8 +45,15 @@ function player.teleport(to, options)
     local ped = PlayerPedId()
     local vehicle = options.keepVehicle and GetVehiclePedIsIn(ped, false) or 0
     local entity = vehicle ~= 0 and vehicle or ped
-    RequestCollisionAtCoord(to.x, to.y, to.z)
-    SetEntityCoords(entity, to.x, to.y, options.ground == false and to.z or to.z - 1.0, false, false, false, false)
+    local z, ground = to.z, options.ground
+    if z == nil or ground == 'find' then
+        FreezeEntityPosition(entity, true)
+        z = (findGround(entity, to.x, to.y) or 0.0) + 1.0
+        FreezeEntityPosition(entity, false)
+        ground = false
+    end
+    RequestCollisionAtCoord(to.x, to.y, z)
+    SetEntityCoords(entity, to.x, to.y, ground == false and z or z - 1.0, false, false, false, false)
     if options.heading then SetEntityHeading(entity, options.heading) end
     aiLib.waitFor(function() return HasCollisionLoadedAroundEntity(entity) or nil end, 3000)
     if fade then DoScreenFadeIn(300) end

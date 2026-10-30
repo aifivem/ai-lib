@@ -186,6 +186,16 @@ function Points:addModel(id, options)
     self.models[id] = aiLib.ModelPoints.add(self.prefix .. id, options, style())
 end
 
+---A point on every vehicle (trunk, hood, push): ox_target's global vehicle option, or a prompt at the nearest
+---networked vehicle within `radius` (default 1.5). `canShow` and `onPressed` get the vehicle.
+---@param id string
+---@param options { label: string, icon?: string, radius?: number, canShow?: fun(vehicle: integer): boolean, onPressed: fun(vehicle: integer) }
+function Points:addVehicle(id, options)
+    local o = { models = {}, vehicles = true }
+    for k, v in pairs(options) do o[k] = v end
+    self:addModel(id, o)
+end
+
 ---Reads `canShow` and function labels again (call when what they read changed: job, duty, vehicle).
 function Points:refresh()
     local mode = style()

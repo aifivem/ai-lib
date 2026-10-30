@@ -23,10 +23,6 @@ AddEventHandler('ai-core:client:menuToggle', function(owner, id, item, checked)
     local l = owner == resource and listening[id]
     if l and l.onToggle then l.onToggle(item, checked) end
 end)
-AddEventHandler('ai-core:client:itemPicked', function(owner, id, name, count)
-    local l = owner == resource and listening[id]
-    if l and l.onPick then l.onPick(name, count) end
-end)
 
 ---@param open fun(id: integer)
 ---@param listeners? AiLibMenuListeners
@@ -52,7 +48,6 @@ end
 ---@class AiLibMenuListeners
 ---@field onHover? fun(item: string) the item under the pointer or focus
 ---@field onToggle? fun(item: string, checked: boolean) a switch row was flipped
----@field onPick? fun(name: string, count: integer) an item picked in the item picker
 
 local menu = {}
 
@@ -75,12 +70,14 @@ function menu.input(request)
     return type(values) == 'table' and values or nil
 end
 
----Shows ai-core's item picker (admin tools; the list only reaches admins) and waits until it is closed (call from a
----thread); `onPick(name, count)` runs for every pick while it stays open.
----@param request { title: string }
----@param onPick fun(name: string, count: integer)
-function menu.itemPicker(request, onPick)
-    ask(function(id) exports['ai-core']:OpenItemPicker(id, request) end, { onPick = onPick })
+---Shows ai-core's item picker (admin tools; the list only reaches admins) and waits (call from a thread): the list
+---the player took (`{ name, count }[]`, capped by `target`'s weight limit), or nil when closed. The caller's server
+---gives the items and checks every one.
+---@param request { title: string, target?: integer }
+---@return { name: string, count: integer }[]?
+function menu.itemPicker(request)
+    local list = ask(function(id) exports['ai-core']:OpenItemPicker(id, request) end)
+    return type(list) == 'table' and list or nil
 end
 
 return menu

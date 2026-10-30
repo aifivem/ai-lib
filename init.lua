@@ -30,8 +30,8 @@ end
 ---@field onServerCallback fun(name: string, handler: (fun(...: any): any)) client
 ---@field notify fun(...: any) client `(text, kind?, duration?)`; server `(source, text, kind?, duration?)`
 ---@field progress fun(options: { label: string, duration: integer, anim?: { dict: string, clip: string, flag?: integer }, allowVehicle?: boolean }): boolean client
----@field menu { show: (fun(request: table, listeners?: table): string?), input: (fun(request: table): table?), itemPicker: (fun(request: { title: string }, onPick: fun(name: string, count: integer))) } client
----@field itemPicker fun(request: { title: string }, onPick: fun(name: string, count: integer)) client, admin tools: waits until closed
+---@field menu { show: (fun(request: table, listeners?: table): string?), input: (fun(request: table): table?), itemPicker: (fun(request: { title: string, target?: integer }): table?) } client
+---@field itemPicker fun(request: { title: string, target?: integer }): table? client, admin tools: the taken list or nil
 ---@field input fun(request: table): table? client
 ---@field showPrompt fun(id: string, text: string) client
 ---@field hidePrompt fun(id: string) client

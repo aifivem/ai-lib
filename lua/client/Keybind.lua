@@ -19,6 +19,7 @@ end)
 ---@field disabled? boolean
 ---@field hint? 'foot'|'vehicle'|'always' HUDs list the key in their key hints then (the owner can change it in the panel)
 ---@field icon? string Font Awesome solid icon name next to the hint
+---@field hintLabel? string short hint text (a lang text); `description` when absent
 ---@field onPressed? fun()
 ---@field onReleased? fun()
 
@@ -57,6 +58,7 @@ function Keybind.new(options)
             mapper = options.defaultMapper or 'keyboard',
             hint = options.hint,
             icon = options.icon,
+            hintLabel = options.hintLabel,
         })
     end
     -- ai-core answers within one server round trip; never leave a key unbound.

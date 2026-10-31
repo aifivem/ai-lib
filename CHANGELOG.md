@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/aifivem/ai-lib/compare/v0.2.0...v0.2.1) (2026-10-31)
+
+
+### Miscellaneous Chores
+
+* rebuild with the current lib ([26d2996](https://github.com/aifivem/ai-lib/commit/26d2996d67fadfdf5da8ea0afaf349f295c45e89))
+
 ## [0.2.0](https://github.com/aifivem/ai-lib/compare/v0.1.0...v0.2.0) (2026-10-31)
 
 

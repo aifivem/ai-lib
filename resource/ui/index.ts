@@ -1,3 +1,4 @@
+import { NUI_LAYER } from "@aicore-fivem/shared";
 // ai-lib's own client script: the shared player UI (prompts, notifications, the progress bar, menus, inputs,
 // minigames) every resource draws through the lib. Runs without ai-core.
 import "./notify";
@@ -8,4 +9,4 @@ import "./progressFor";
 import "./zoneHost";
 
 // Above the other NUI pages (a menu over the character screen, a notification over an inventory).
-SetNuiZindex(100);
+SetNuiZindex(NUI_LAYER.lib);

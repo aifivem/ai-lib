@@ -17039,7 +17039,7 @@ const core$16 = resourceExport(CORE.resource), world = {
 	gain: (source, amount) => amount > 0 && core$4.AddStress(source, amount),
 	relieve: (source, amount) => amount > 0 && core$4.AddStress(source, -amount),
 	provider: () => core$4.GetStressSystem()
-}, core$3 = resourceExport(CORE.resource), doors = {
+}, needs = { refill: (source) => core$4.RefillNeeds(source) }, core$3 = resourceExport(CORE.resource), doors = {
 	setLocked: (id, locked, by) => core$3.SetDoorLocked(id, locked, by),
 	isLocked: (id) => core$3.IsDoorLocked(id),
 	provider: () => core$3.GetDoorlockSystem()
@@ -17116,6 +17116,7 @@ var server_exports = __exportAll({
 	nearestPlayerTo: () => nearestPlayerTo,
 	nearestVehicleAt: () => nearestVehicleAt,
 	nearestVehicleTo: () => nearestVehicleTo,
+	needs: () => needs,
 	notify: () => notify,
 	onCharacter: () => onCharacter,
 	onClientCallback: () => onClientCallback,

@@ -649,21 +649,16 @@ const CORE = {
 	clientPlayerUnloadedEvent: "ai-core:client:playerUnloaded",
 	clientCharacterPortraitEvent: "ai-core:client:characterPortrait",
 	characterLooksEvent: "ai-core:client:characterLooks",
-	clientPromptPressedEvent: "ai-core:client:promptPressed",
 	clientCacheEvent: "ai-core:client:cache",
 	clientHudVisibleEvent: "ai-core:client:hudVisible",
 	clientWorldSyncEvent: "ai-core:client:worldSync",
-	clientCancelProgressEvent: "ai-core:client:cancelProgress",
 	clientDefinitionsEvent: "ai-core:client:definitions",
 	vehicleTypeCallback: "ai-core:vehicleType",
-	progressForCallback: "ai-core:progressFor",
-	progressForCancelEvent: "ai-core:client:progressForCancel",
 	interactionStateKey: "ai:interaction",
 	charactersCallback: "ai-core:characters",
 	createCharacterCallback: "ai-core:createCharacter",
 	deleteCharacterCallback: "ai-core:deleteCharacter",
 	selectCharacterCallback: "ai-core:selectCharacter",
-	clientNotifyEvent: "ai-core:client:notify",
 	spawnEvent: "ai-core:client:spawn",
 	chooseSpawnEvent: "ai-core:client:chooseSpawn",
 	spawnChoiceCallback: "ai-core:spawnChoice",
@@ -694,8 +689,33 @@ function toCharacterAppearance(value) {
 		data
 	} : null;
 }
-// ../../../packages/lib/src/fivem/exports.ts
-const named = new Set();
+// ../../../packages/shared/src/minigame.ts
+const SKILL_STAGES = {
+	easy: {
+		area: 50,
+		speed: .6
+	},
+	medium: {
+		area: 40,
+		speed: .85
+	},
+	hard: {
+		area: 25,
+		speed: 1
+	}
+}, LOCKPICK_AREAS = {
+	easy: 18,
+	medium: 11,
+	hard: 6
+}, LIB_UI = {
+	resource: "ai-lib",
+	notifyEvent: "ai-lib:client:notify",
+	promptPressedEvent: "ai-lib:client:promptPressed",
+	cancelProgressEvent: "ai-lib:client:cancelProgress",
+	progressForCallback: "ai-lib:progressFor",
+	progressForCancelEvent: "ai-lib:client:progressForCancel",
+	minigameForCallback: "ai-lib:minigameFor"
+}, named = new Set();
 function registerExport(name, handler) {
 	named.add(name), globalThis.exports(name, handler);
 	let first = name.charAt(0), twin = (first === first.toUpperCase() ? first.toLowerCase() : first.toUpperCase()) + name.slice(1);
@@ -1307,7 +1327,7 @@ function notify(source, text, kind = "info", duration) {
 		kind,
 		duration
 	};
-	emitNet(CORE.clientNotifyEvent, source, notification);
+	emitNet(LIB_UI.notifyEvent, source, notification);
 }
 // ../../../packages/lib/src/server/inventory.ts
 const core$13 = resourceExport(CORE.resource), inventory = {
@@ -1870,14 +1890,27 @@ on(CORE.playerUnloadedEvent, (source) => {
 });
 function progressFor(source, options) {
 	let previous = running.get(source);
-	previous && (previous(!1), emitNet(CORE.progressForCancelEvent, source));
+	previous && (previous(!1), emitNet(LIB_UI.progressForCancelEvent, source));
 	let { minRatio = .8, ...bar } = options, startedAt = GetGameTimer();
 	return new Promise((resolve) => {
 		let done = !1, settle = (ok) => {
 			done || (done = !0, running.get(source) === settle && running.delete(source), resolve(ok));
 		};
-		running.set(source, settle), triggerClientCallback(CORE.progressForCallback, source, [bar], bar.duration + 15e3).then((answer) => settle(answer === !0 && GetGameTimer() - startedAt >= bar.duration * minRatio), () => settle(!1));
+		running.set(source, settle), triggerClientCallback(LIB_UI.progressForCallback, source, [bar], bar.duration + 15e3).then((answer) => settle(answer === !0 && GetGameTimer() - startedAt >= bar.duration * minRatio), () => settle(!1));
 	});
+}
+async function minigameFor(source, options) {
+	let level = options.difficulty ?? "medium", request = options.game === "lockpick" ? {
+		kind: "lockpick",
+		pins: Math.min(6, Math.max(1, Math.floor(options.pins ?? 1))),
+		area: LOCKPICK_AREAS[level],
+		picks: Math.min(10, Math.max(1, Math.floor(options.picks ?? 1)))
+	} : {
+		kind: "skillCheck",
+		stages: Array.from({ length: Math.min(10, Math.max(1, options.rounds ?? 2)) }, () => SKILL_STAGES[level]),
+		keys: options.keys ?? ["e"]
+	}, answer = await triggerClientCallback(LIB_UI.minigameForCallback, source, [request], 12e4).catch(() => null);
+	return answer === !0 || answer === "opened" ? "won" : answer === "broken" ? "broken" : "lost";
 }
 // ../../../packages/lib/src/server/command.ts
 const resource$3 = GetCurrentResourceName(), log$3 = createLogger(resource$3);
@@ -16630,6 +16663,7 @@ var server_exports = __exportAll({
 	isResourceStarted: () => isResourceStarted,
 	loadLocaleTexts: () => loadLocaleTexts,
 	medical: () => medical,
+	minigameFor: () => minigameFor,
 	money: () => money,
 	near: () => near,
 	nearestPlayerTo: () => nearestPlayerTo,

@@ -86,4 +86,12 @@ const sides = ["client", "server"].filter((side) =>
   existsSync(`./resource/${side}/index.ts`),
 );
 
-export default defineConfig(sides.map(createConfig));
+// ai-lib's own client script (the shared player UI host); the client and server bundles are for other resources.
+const ui: UserConfig = {
+  ...createConfig("client"),
+  name: "ui",
+  entry: { ui: "./resource/ui/index.ts" },
+  tsconfig: "./resource/ui/tsconfig.json",
+};
+
+export default defineConfig([...sides.map(createConfig), ui]);

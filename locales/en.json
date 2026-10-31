@@ -1,1 +1,9 @@
-{}
+{
+  "KEYBIND_INTERACT": "Interact with the prompt on screen",
+  "KEYBIND_CANCEL_PROGRESS": "Cancel the running action",
+  "MINIGAME_MOVE": "Move the pick",
+  "MINIGAME_TURN": "Turn the lock",
+  "MINIGAME_PRESS": "Press on the green",
+  "MINIGAME_CANCEL": "Give up",
+  "MINIGAME_PICKS": "Picks"
+}

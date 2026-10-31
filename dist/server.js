@@ -468,6 +468,11 @@ function readPlacePed(value) {
 		coords
 	};
 }
+// ../../../packages/lib/src/shared/grid.ts
+const OFFSET = 16384, clampCell = (v) => Math.max(-16e3, Math.min(16e3, v)), gridCell = (x, y, size) => ({
+	cx: clampCell(Math.floor(x / size)),
+	cy: clampCell(Math.floor(y / size))
+}), cellKey = (cx, cy) => (clampCell(cx) + OFFSET) * 32768 + (clampCell(cy) + OFFSET);
 // ../../../packages/lib/src/shared/index.ts
 var shared_exports = __exportAll({
 	BLIP_STYLE_FIELDS: () => BLIP_STYLE_FIELDS,
@@ -476,10 +481,12 @@ var shared_exports = __exportAll({
 	PLACE_PED_SPEC: () => PLACE_PED_SPEC,
 	asArgs: () => asArgs,
 	bool: () => bool,
+	cellKey: () => cellKey,
 	createLogger: () => createLogger,
 	distance: () => distance,
 	fail: () => fail,
 	formatText: () => formatText,
+	gridCell: () => gridCell,
 	groupDigits: () => groupDigits,
 	headingTo: () => headingTo,
 	int: () => int,
@@ -649,6 +656,8 @@ const CORE = {
 	clientCancelProgressEvent: "ai-core:client:cancelProgress",
 	clientDefinitionsEvent: "ai-core:client:definitions",
 	vehicleTypeCallback: "ai-core:vehicleType",
+	progressForCallback: "ai-core:progressFor",
+	progressForCancelEvent: "ai-core:client:progressForCancel",
 	interactionStateKey: "ai:interaction",
 	charactersCallback: "ai-core:characters",
 	createCharacterCallback: "ai-core:createCharacter",
@@ -1637,8 +1646,194 @@ function onCharacter(handlers) {
 		}
 	});
 }
-// ../../../packages/lib/src/server/pending.ts
-var PendingActions = class {
+// ../../../packages/lib/src/server/areaStream.ts
+var AreaStream = class {
+	options;
+	items = new Map();
+	cells = new Map();
+	followers = new PlayerMap({ onDrop: (source, f) => this.leave(source, f) });
+	inCell = new Map();
+	alsoOf = new Map();
+	size_;
+	range;
+	chunk;
+	stale = !1;
+	constructor(options) {
+		this.options = options, this.size_ = options.cellSize ?? 64, this.range = options.range ?? 1, this.chunk = options.chunk ?? 50;
+	}
+	get size() {
+		return this.items.size;
+	}
+	get(id) {
+		return this.items.get(id)?.item;
+	}
+	*values() {
+		for (let entry of this.items.values()) yield entry.item;
+	}
+	cellOf(x, y) {
+		return gridCell(x, y, this.size_);
+	}
+	countAt(x, y) {
+		let { cx, cy } = this.cellOf(x, y);
+		return this.cells.get(cellKey(cx, cy))?.size ?? 0;
+	}
+	*around(x, y, cells = 1) {
+		let { cx, cy } = this.cellOf(x, y);
+		for (let dx = -cells; dx <= cells; dx++) for (let dy = -cells; dy <= cells; dy++) for (let entry of this.cells.get(cellKey(cx + dx, cy + dy)) ?? []) yield entry.item;
+	}
+	set(item, resend = !0) {
+		this.stale && this.followAll();
+		let { cx, cy } = this.cellOf(item.x, item.y), also = this.options.alsoTo?.(item), entry = this.items.get(item.id);
+		if (!entry) {
+			let fresh = {
+				item,
+				cx,
+				cy,
+				also: void 0
+			};
+			this.items.set(item.id, fresh), this.file(fresh), this.setAlso(fresh, also);
+			let put = [this.options.view(item)];
+			for (let source of this.who(cx, cy, also)) this.send(source, put, []);
+			return;
+		}
+		let before = this.who(entry.cx, entry.cy, entry.also);
+		(entry.cx !== cx || entry.cy !== cy) && (this.unfile(entry), entry.cx = cx, entry.cy = cy, this.file(entry)), entry.item = item, this.setAlso(entry, also);
+		let after = this.who(cx, cy, also), gone = [item.id];
+		for (let source of before) after.has(source) || this.send(source, [], gone);
+		let put = [this.options.view(item)];
+		for (let source of after) (resend || !before.has(source)) && this.send(source, put, []);
+	}
+	delete(id) {
+		let entry = this.items.get(id);
+		if (!entry) return;
+		this.items.delete(id), this.unfile(entry);
+		let gone = [id];
+		for (let source of this.who(entry.cx, entry.cy, entry.also)) this.send(source, [], gone);
+		this.setAlso(entry, void 0);
+	}
+	load(items) {
+		for (let item of items) {
+			let old = this.items.get(item.id);
+			old && (this.unfile(old), this.setAlso(old, void 0));
+			let { cx, cy } = this.cellOf(item.x, item.y), entry = {
+				item,
+				cx,
+				cy,
+				also: void 0
+			};
+			this.items.set(item.id, entry), this.file(entry), this.setAlso(entry, this.options.alsoTo?.(item));
+		}
+		for (let [source, f] of this.followers) this.snapshot(source, f);
+	}
+	recipients(id) {
+		let entry = this.items.get(id);
+		return entry ? this.who(entry.cx, entry.cy, entry.also) : new Set();
+	}
+	knows(source, id) {
+		let entry = this.items.get(id);
+		if (!entry) return !1;
+		if (entry.also === source) return !0;
+		let f = this.followers.get(source);
+		return f !== void 0 && Math.abs(f.cx - entry.cx) <= this.range && Math.abs(f.cy - entry.cy) <= this.range;
+	}
+	start(source, at = coordsOf(source)) {
+		let { cx, cy } = this.cellOf(at.x, at.y), old = this.followers.get(source);
+		old && this.leave(source, old);
+		let f = {
+			cx,
+			cy
+		};
+		this.followers.set(source, f), this.enter(source, f), this.snapshot(source, f);
+	}
+	follow(source, cx, cy) {
+		let f = this.followers.get(source);
+		if (!f) {
+			let fresh = {
+				cx,
+				cy
+			};
+			return this.followers.set(source, fresh), this.enter(source, fresh), this.snapshot(source, fresh);
+		}
+		this.move(source, f, cx, cy);
+	}
+	followReported(source, cx, cy) {
+		let p = coordsOf(source), real = this.cellOf(p.x, p.y);
+		return Math.abs(real.cx - cx) > 1 || Math.abs(real.cy - cy) > 1 ? !1 : (this.follow(source, cx, cy), !0);
+	}
+	followAll() {
+		if (this.items.size === 0) this.stale = !0;
+		else {
+			this.stale = !1;
+			for (let [source, f] of this.followers) {
+				let p = coordsOf(source), { cx, cy } = this.cellOf(p.x, p.y);
+				this.move(source, f, cx, cy);
+			}
+		}
+	}
+	stop(source, tell = !1) {
+		let f = this.followers.get(source);
+		f && (this.followers.delete(source), this.leave(source, f), tell && this.emit(source, !0, [], []));
+	}
+	following(source) {
+		return this.followers.has(source);
+	}
+	move(source, f, cx, cy) {
+		if (f.cx === cx && f.cy === cy) return;
+		let r = this.range, removes = [], puts = [];
+		for (let dx = -r; dx <= r; dx++) for (let dy = -r; dy <= r; dy++) {
+			let ox = f.cx + dx, oy = f.cy + dy;
+			if (Math.abs(ox - cx) > r || Math.abs(oy - cy) > r) for (let entry of this.cells.get(cellKey(ox, oy)) ?? []) entry.also !== source && removes.push(entry.item.id);
+			let nx = cx + dx, ny = cy + dy;
+			if (Math.abs(nx - f.cx) > r || Math.abs(ny - f.cy) > r) for (let entry of this.cells.get(cellKey(nx, ny)) ?? []) entry.also !== source && puts.push(this.options.view(entry.item));
+		}
+		this.leave(source, f), f.cx = cx, f.cy = cy, this.enter(source, f), (puts.length > 0 || removes.length > 0) && this.send(source, puts, removes);
+	}
+	snapshot(source, f) {
+		let puts = [], r = this.range;
+		for (let dx = -r; dx <= r; dx++) for (let dy = -r; dy <= r; dy++) for (let entry of this.cells.get(cellKey(f.cx + dx, f.cy + dy)) ?? []) puts.push(this.options.view(entry.item));
+		for (let entry of this.alsoOf.get(source) ?? []) (Math.abs(entry.cx - f.cx) > r || Math.abs(entry.cy - f.cy) > r) && puts.push(this.options.view(entry.item));
+		this.emit(source, !0, puts, []);
+	}
+	who(cx, cy, also) {
+		let out = new Set(), r = this.range;
+		for (let dx = -r; dx <= r; dx++) for (let dy = -r; dy <= r; dy++) for (let source of this.inCell.get(cellKey(cx + dx, cy + dy)) ?? []) out.add(source);
+		return also !== void 0 && out.add(also), out;
+	}
+	send(source, puts, removes) {
+		this.emit(source, !1, puts, removes);
+	}
+	emit(source, reset, puts, removes) {
+		let extra = this.options.extra?.() ?? [], { event } = this.options;
+		emitNet(event, source, reset, puts.slice(0, this.chunk), removes, ...extra);
+		for (let i = this.chunk; i < puts.length; i += this.chunk) emitNet(event, source, !1, puts.slice(i, i + this.chunk), [], ...extra);
+	}
+	setAlso(entry, also) {
+		if (entry.also === also) return;
+		if (entry.also !== void 0) {
+			let set = this.alsoOf.get(entry.also);
+			set?.delete(entry), set?.size === 0 && this.alsoOf.delete(entry.also);
+		}
+		if (entry.also = also, also === void 0) return;
+		let set = this.alsoOf.get(also);
+		set || this.alsoOf.set(also, set = new Set()), set.add(entry);
+	}
+	file(entry) {
+		let key = cellKey(entry.cx, entry.cy), set = this.cells.get(key);
+		set || this.cells.set(key, set = new Set()), set.add(entry);
+	}
+	unfile(entry) {
+		let key = cellKey(entry.cx, entry.cy), set = this.cells.get(key);
+		set?.delete(entry), set?.size === 0 && this.cells.delete(key);
+	}
+	enter(source, f) {
+		let key = cellKey(f.cx, f.cy), set = this.inCell.get(key);
+		set || this.inCell.set(key, set = new Set()), set.add(source);
+	}
+	leave(source, f) {
+		let key = cellKey(f.cx, f.cy), set = this.inCell.get(key);
+		set?.delete(source), set?.size === 0 && this.inCell.delete(key);
+	}
+}, PendingActions = class {
 	actions = new PlayerMap();
 	minRatio;
 	next = 0;
@@ -1667,6 +1862,23 @@ var PendingActions = class {
 		return this.actions.size;
 	}
 };
+// ../../../packages/lib/src/server/progressFor.ts
+const running = new PlayerMap({ onDrop: (_source, settle) => settle(!1) });
+on(CORE.playerUnloadedEvent, (source) => {
+	let settle = running.get(source);
+	settle && settle(!1);
+});
+function progressFor(source, options) {
+	let previous = running.get(source);
+	previous && (previous(!1), emitNet(CORE.progressForCancelEvent, source));
+	let { minRatio = .8, ...bar } = options, startedAt = GetGameTimer();
+	return new Promise((resolve) => {
+		let done = !1, settle = (ok) => {
+			done || (done = !0, running.get(source) === settle && running.delete(source), resolve(ok));
+		};
+		running.set(source, settle), triggerClientCallback(CORE.progressForCallback, source, [bar], bar.duration + 15e3).then((answer) => settle(answer === !0 && GetGameTimer() - startedAt >= bar.duration * minRatio), () => settle(!1));
+	});
+}
 // ../../../packages/lib/src/server/command.ts
 const resource$3 = GetCurrentResourceName(), log$3 = createLogger(resource$3);
 let texts = null;
@@ -16379,6 +16591,7 @@ const core$9 = resourceExport(CORE.resource), world = {
 // ../../../packages/lib/src/server/index.ts
 var server_exports = __exportAll({
 	AdminPanel: () => AdminPanel,
+	AreaStream: () => AreaStream,
 	ClientGate: () => ClientGate,
 	Cooldowns: () => Cooldowns,
 	DataFile: () => DataFile,
@@ -16434,6 +16647,7 @@ var server_exports = __exportAll({
 	playersNear: () => playersNear,
 	playersNearEntity: () => playersNearEntity,
 	prison: () => prison,
+	progressFor: () => progressFor,
 	provideExport: () => provideExport,
 	randomPlate: () => randomPlate,
 	registerExport: () => registerExport,

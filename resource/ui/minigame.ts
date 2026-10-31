@@ -1,4 +1,8 @@
-import { onServerCallback, registerExport } from "@aicore-fivem/lib/client";
+import {
+  caller,
+  onServerCallback,
+  registerExport,
+} from "@aicore-fivem/lib/client";
 import { isRecord } from "@aicore-fivem/lib/shared";
 import {
   LIB_UI,
@@ -59,7 +63,7 @@ const texts = () => ({
 registerExport("OpenMinigame", (id: unknown, request: unknown) => {
   const game = toRequest(request);
   if (typeof id !== "number" || !game) return;
-  dialogs.open("minigame", GetInvokingResource() || ResourceName, id, {
+  dialogs.open("minigame", caller(), id, {
     ...game,
     texts: texts(),
   });

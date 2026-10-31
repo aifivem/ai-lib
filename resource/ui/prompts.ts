@@ -1,4 +1,5 @@
 import {
+  caller,
   every,
   Keybind,
   optionalExport,
@@ -117,15 +118,9 @@ const prompts = new Prompts();
 
 registerExport("ShowPrompt", (id: unknown, text: unknown, at: unknown) => {
   if (typeof id === "string" && typeof text === "string")
-    prompts.show(
-      GetInvokingResource() || ResourceName,
-      id,
-      text,
-      at == null ? null : readVec3(at),
-    );
+    prompts.show(caller(), id, text, at == null ? null : readVec3(at));
 });
 registerExport("HidePrompt", (id: unknown) => {
-  if (typeof id === "string")
-    prompts.hide(GetInvokingResource() || ResourceName, id);
+  if (typeof id === "string") prompts.hide(caller(), id);
 });
 on("onClientResourceStop", (resource: string) => prompts.drop(resource));

@@ -141,7 +141,7 @@ function replyError(reply, fallback) {
 	return typeof error == "string" && error !== "" ? error : fallback;
 }
 // ../../../packages/lib/src/shared/vec.ts
-const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
+const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z), flatDistance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 function headingTo(from, to) {
 	return (-(Math.atan2(to.x - from.x, to.y - from.y) * 180 / Math.PI) + 360) % 360;
 }
@@ -153,6 +153,21 @@ function nearestOf(items, point, pos, max = Infinity) {
 	}
 	return best;
 }
+// ../../../packages/lib/src/shared/random.ts
+const randomInt = (min, max) => min + Math.floor(Math.random() * (max - min + 1)), pickRandom = (list) => list[Math.floor(Math.random() * list.length)], rollChance = (percent) => Math.random() * 100 < percent;
+// ../../../packages/lib/src/shared/clock.ts
+var ServerClock = class {
+	offset = 0;
+	sync(serverNow) {
+		this.offset = serverNow - Date.now();
+	}
+	now() {
+		return Date.now() + this.offset;
+	}
+	toLocal(serverTime) {
+		return serverTime - this.offset;
+	}
+};
 // ../../../packages/lib/src/shared/format.ts
 function round(value, decimals = 0) {
 	let power = 10 ** decimals;
@@ -574,6 +589,7 @@ var shared_exports = __exportAll({
 	LiveRecords: () => LiveRecords,
 	PLACE_PED_SPEC: () => PLACE_PED_SPEC,
 	RecordObjects: () => RecordObjects,
+	ServerClock: () => ServerClock,
 	accessFields: () => accessFields,
 	asArgs: () => asArgs,
 	bool: () => bool,
@@ -582,6 +598,7 @@ var shared_exports = __exportAll({
 	decideAccess: () => decideAccess,
 	distance: () => distance,
 	fail: () => fail,
+	flatDistance: () => flatDistance,
 	formatText: () => formatText,
 	formatWeight: () => formatWeight,
 	gridCell: () => gridCell,
@@ -596,9 +613,11 @@ var shared_exports = __exportAll({
 	normalizePlate: () => normalizePlate,
 	num: () => num,
 	oneArg: () => oneArg,
+	pickRandom: () => pickRandom,
 	placePedFields: () => placePedFields,
 	polyFromCorners: () => polyFromCorners,
 	previewJson: () => previewJson,
+	randomInt: () => randomInt,
 	readAccess: () => readAccess,
 	readBlipStyle: () => readBlipStyle,
 	readFinite: () => readFinite,
@@ -611,6 +630,7 @@ var shared_exports = __exportAll({
 	readVec4: () => readVec4,
 	record: () => record,
 	replyError: () => replyError,
+	rollChance: () => rollChance,
 	round: () => round,
 	sleep: () => sleep,
 	spec: () => spec,
@@ -758,6 +778,8 @@ const CORE = {
 	vehicleTypeCallback: "ai-core:vehicleType",
 	interactionStateKey: "ai:interaction",
 	pvpStateKey: "ai:pvp",
+	medicalStateKey: "ai:medical",
+	clientDeadEvent: "ai-core:client:dead",
 	charactersCallback: "ai-core:characters",
 	createCharacterCallback: "ai-core:createCharacter",
 	deleteCharacterCallback: "ai-core:deleteCharacter",
@@ -877,6 +899,10 @@ function entityCoords(entity) {
 	};
 }
 const coordsOf = (source) => entityCoords(GetPlayerPed(String(source)));
+function vehicleOf(source, options = {}) {
+	let ped = GetPlayerPed(String(source)), vehicle = GetVehiclePedIsIn(ped, !1);
+	return !vehicle || !options.driver || GetPedInVehicleSeat(vehicle, -1) === ped ? vehicle : 0;
+}
 function isNear(source, point, metres) {
 	let [x = 0, y = 0, z = 0] = GetEntityCoords(GetPlayerPed(String(source))), dx = x - point.x, dy = y - point.y, dz = z - point.z;
 	return dx * dx + dy * dy + dz * dz <= metres * metres;
@@ -1551,6 +1577,9 @@ var OnlinePlayers = class {
 	character(source) {
 		return this.start(), this.players.get(source)?.character ?? null;
 	}
+	charId(source) {
+		return this.start(), this.players.get(source)?.character.id;
+	}
 	name(source, options = {}) {
 		let c = this.character(source);
 		return c ? `${c.firstname} ${c.lastname}` : options.fallback === !1 ? "" : GetPlayerName(String(source));
@@ -1796,19 +1825,19 @@ function onCharacter(handlers) {
 		} catch (error) {
 			log$4.error(`character loaded handler failed for ${source}`, error);
 		}
-	}, end = (source, charId) => {
+	}, end = (source, charId, reason) => {
 		if (live.delete(source)) try {
-			handlers.unloaded?.(source, charId);
+			handlers.unloaded?.(source, charId, reason);
 		} catch (error) {
 			log$4.error(`character unloaded handler failed for ${source}`, error);
 		}
 	};
 	on(CORE.playerLoadedEvent, (source, character) => {
 		let previous = live.get(source);
-		previous !== void 0 && end(source, previous), deliver(source, character);
-	}), on(CORE.playerUnloadedEvent, (source, charId) => end(source, charId)), onDropped((source) => setImmediate(() => {
+		previous !== void 0 && end(source, previous, "switch"), deliver(source, character);
+	}), on(CORE.playerUnloadedEvent, (source, charId, reason) => end(source, charId, reason === "dropped" ? "dropped" : "switch")), onDropped((source) => setImmediate(() => {
 		let charId = live.get(source);
-		charId !== void 0 && end(source, charId);
+		charId !== void 0 && end(source, charId, "dropped");
 	})), setImmediate(() => {
 		for (let source of online.sources()) {
 			if (live.has(source)) continue;
@@ -2033,6 +2062,28 @@ var AreaStream = class {
 	}
 	get size() {
 		return this.actions.size;
+	}
+}, KeyWatchers = class {
+	byKey = new Map();
+	keys = new PlayerMap({ onDrop: (source, key) => this.leave(source, key) });
+	watch(source, key) {
+		this.stop(source), this.keys.set(source, key);
+		let set = this.byKey.get(key);
+		set || this.byKey.set(key, set = new Set()), set.add(source);
+	}
+	stop(source) {
+		let key = this.keys.get(source);
+		key !== void 0 && (this.keys.delete(source), this.leave(source, key));
+	}
+	of(key) {
+		return this.byKey.get(key);
+	}
+	keyOf(source) {
+		return this.keys.get(source);
+	}
+	leave(source, key) {
+		let set = this.byKey.get(key);
+		set && (set.delete(source), set.size === 0 && this.byKey.delete(key));
 	}
 };
 // ../../../packages/lib/src/server/progressFor.ts
@@ -16496,7 +16547,7 @@ function caller() {
 }
 const stopHandlers = [];
 let listening = !1;
-function onStop(handler) {
+function onAnyStop(handler) {
 	if (stopHandlers.push(handler), listening) return;
 	listening = !0;
 	let event = IsDuplicityVersion() ? "onResourceStop" : "onClientResourceStop";
@@ -16504,12 +16555,18 @@ function onStop(handler) {
 		for (let stop of stopHandlers) stop(resource);
 	});
 }
+function onStop(fn) {
+	let self = GetCurrentResourceName();
+	onAnyStop((resource) => {
+		resource === self && fn();
+	});
+}
 var ByResource = class {
 	options;
 	byOwner = new Map();
 	owners = new Map();
 	constructor(options = {}) {
-		this.options = options, onStop((resource) => this.dropResource(resource));
+		this.options = options, onAnyStop((resource) => this.dropResource(resource));
 	}
 	set(key, value, owner = caller()) {
 		let previous = this.owners.get(key);
@@ -16551,7 +16608,7 @@ var ByResource = class {
 	set_ = new Set();
 	listeners = [];
 	constructor() {
-		onStop((resource) => {
+		onAnyStop((resource) => {
 			let before = this.any;
 			for (let key of this.set_) key.startsWith(`${resource}:`) && this.set_.delete(key);
 			this.notify(before);
@@ -16889,6 +16946,7 @@ var server_exports = __exportAll({
 	EntityState: () => EntityState,
 	GlobalGroup: () => GlobalGroup,
 	GlobalKey: () => GlobalKey,
+	KeyWatchers: () => KeyWatchers,
 	KeyedCooldowns: () => KeyedCooldowns,
 	LOCALE_CONVAR: () => LOCALE_CONVAR,
 	PendingActions: () => PendingActions,
@@ -16934,6 +16992,7 @@ var server_exports = __exportAll({
 	onCharacter: () => onCharacter,
 	onClientCallback: () => onClientCallback,
 	onClientEvent: () => onClientEvent,
+	onStop: () => onStop,
 	online: () => online,
 	optionalExport: () => optionalExport,
 	patchPlayerData: () => patchPlayerData,
@@ -16957,6 +17016,7 @@ var server_exports = __exportAll({
 	vehicleFromNet: () => vehicleFromNet,
 	vehicleKeys: () => vehicleKeys,
 	vehicleNearPlayer: () => vehicleNearPlayer,
+	vehicleOf: () => vehicleOf,
 	vehicleType: () => vehicleType,
 	world: () => world
 });

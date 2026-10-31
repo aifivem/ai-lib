@@ -1,4 +1,4 @@
-import { controls, registerExport } from "@aicore-fivem/lib/client";
+import { caller, controls, registerExport } from "@aicore-fivem/lib/client";
 import { isRecord, logSafe } from "@aicore-fivem/lib/shared";
 import {
   MENU_EVENTS,
@@ -184,13 +184,12 @@ export const dialogs = new Dialogs();
 
 registerExport("OpenMenu", (id: unknown, request: unknown) => {
   const menu = toMenu(request);
-  if (typeof id === "number" && menu)
-    dialogs.open("menu", GetInvokingResource() || ResourceName, id, menu);
+  if (typeof id === "number" && menu) dialogs.open("menu", caller(), id, menu);
 });
 registerExport("OpenInput", (id: unknown, request: unknown) => {
   const input = toInput(request);
   if (typeof id === "number" && input)
-    dialogs.open("input", GetInvokingResource() || ResourceName, id, input);
+    dialogs.open("input", caller(), id, input);
 });
 
 RegisterNuiCallback(
@@ -220,6 +219,4 @@ on("onClientResourceStop", (resource: string) => dialogs.drop(resource));
  * Closes the calling resource's open menu or input dialog from code (the bridge's ESX `CloseContext` /
  * `menu.close()`, qb-menu `closeMenu`); the request is answered with null like a player close.
  */
-registerExport("CloseDialog", () =>
-  dialogs.drop(GetInvokingResource() || ResourceName),
-);
+registerExport("CloseDialog", () => dialogs.drop(caller()));

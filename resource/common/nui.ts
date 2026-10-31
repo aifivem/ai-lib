@@ -2,8 +2,10 @@
 
 /** Client -> NUI messages: `{ action, data }`. */
 export const NuiMessage = {
-  /** data: { key, text, button }, a prompt appears (or its text changes) on the right. */
+  /** data: { key, text, button, world }, a prompt appears (or its text changes) on the right, or over a world point. */
   promptShow: "promptShow",
+  /** data: [key, x, y][] screen positions (0-1) of world prompts that moved; x < 0 = off screen. */
+  promptMove: "promptMove",
   /** data: key */
   promptHide: "promptHide",
   /** data: Notification */

@@ -18,18 +18,16 @@ const clamp = (v: unknown, min: number, max: number, fallback: number) =>
 function toRequest(v: unknown): MinigameRequest | null {
   if (!isRecord(v)) return null;
   if (v.kind === "skillCheck" && Array.isArray(v.stages)) {
-    const stages: SkillStage[] = v.stages
-      .slice(0, 20)
-      .flatMap((s) =>
-        isRecord(s)
-          ? [
-              {
-                area: clamp(s.area, 5, 180, 50),
-                speed: clamp(s.speed, 0.1, 3, 0.6),
-              },
-            ]
-          : [],
-      );
+    const stages: SkillStage[] = v.stages.slice(0, 20).flatMap((s) =>
+      isRecord(s)
+        ? [
+            {
+              area: clamp(s.area, 5, 180, 50),
+              speed: clamp(s.speed, 0.1, 3, 0.6),
+            },
+          ]
+        : [],
+    );
     const keys = Array.isArray(v.keys)
       ? v.keys.filter(
           (k): k is string => typeof k === "string" && /^[a-z0-9]$/.test(k),

@@ -7,6 +7,7 @@ import "./dialogs";
 import "./minigame";
 import "./progressFor";
 import "./zoneHost";
+import "./modelHost";
 
 // Above the other NUI pages (a menu over the character screen, a notification over an inventory).
 SetNuiZindex(NUI_LAYER.lib);

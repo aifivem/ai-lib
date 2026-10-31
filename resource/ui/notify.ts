@@ -1,10 +1,13 @@
 import {
+  GlobalKey,
   Keybind,
   onServerEvent,
+  optionalExport,
   registerExport,
+  stateString,
 } from "@aicore-fivem/lib/client";
 import { asArgs, logSafe } from "@aicore-fivem/lib/shared";
-import { LIB_UI, type Notification } from "@aicore-fivem/shared";
+import { CORE, LIB_UI, type Notification } from "@aicore-fivem/shared";
 import { NuiMessage } from "common/nui";
 import Locale from "common/locale";
 
@@ -33,9 +36,25 @@ function toNotification(v: unknown): Notification | null {
   return { text: logSafe(v.text, 300), title, kind, duration };
 }
 
+/** Another notification UI the owner picked in ai-core's panel (unset without ai-core: our own cards). */
+const external = new GlobalKey(CORE.notifyStateKey, stateString);
+
+/** Hands a card to ai-core's notify layer while a UI is picked; false when it did not take it (then we draw it). */
+function sendExternal(n: Notification): boolean {
+  if (external.get() === undefined) return false;
+  try {
+    return optionalExport("ai-core")?.ExternalNotify(n) === true;
+  } catch {
+    // ai-core's client is still loading ("No such export"): our own card instead of none.
+    return false;
+  }
+}
+
 /** Notification cards and the progress bar for every resource (lib `notify` / `progress`); ai-lib only draws them. */
 const show = (n: Notification | null) =>
-  n && SendNUIMessage({ action: NuiMessage.notify, data: n });
+  n &&
+  !sendExternal(n) &&
+  SendNUIMessage({ action: NuiMessage.notify, data: n });
 
 registerExport("Notify", (n: unknown) => show(toNotification(n)));
 onServerEvent(

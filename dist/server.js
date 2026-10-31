@@ -823,6 +823,12 @@ const CORE = {
 	pvpStateKey: "ai:pvp",
 	medicalStateKey: "ai:medical",
 	clientDeadEvent: "ai-core:client:dead",
+	mdtStateKey: "ai:mdt",
+	billsEvent: "ai-core:client:bills",
+	payBillCallback: "ai-core:payBill",
+	clientSeatbeltEvent: "ai-core:client:seatbelt",
+	stressRelayEvent: "ai-core:client:stress",
+	notifyStateKey: "ai:notify",
 	charactersCallback: "ai-core:characters",
 	createCharacterCallback: "ai-core:createCharacter",
 	deleteCharacterCallback: "ai-core:deleteCharacter",
@@ -831,7 +837,25 @@ const CORE = {
 	chooseSpawnEvent: "ai-core:client:chooseSpawn",
 	spawnChoiceCallback: "ai-core:spawnChoice",
 	openCharactersEvent: "ai-core:client:openCharacters"
-}, ADMIN = {
+};
+// ../../../packages/shared/src/garages.ts
+function toGaragedVehicles(raw) {
+	if (!Array.isArray(raw)) return null;
+	let list = [];
+	for (let v of raw) {
+		if (typeof v != "object" || !v) continue;
+		let r = v;
+		typeof r.plate == "string" && list.push({
+			plate: r.plate,
+			model: typeof r.model == "string" ? r.model : null,
+			garage: typeof r.garage == "string" ? r.garage : null,
+			impounded: r.impounded === !0
+		});
+	}
+	return list;
+}
+// ../../../packages/shared/src/admin.ts
+const ADMIN = {
 	ace: "ai.admin",
 	openCallback: "ai-core:admin:open",
 	panelDataCallback: "ai-core:admin:panelData",
@@ -884,7 +908,8 @@ const SKILL_STAGES = {
 	progressForCallback: "ai-lib:progressFor",
 	progressForCancelEvent: "ai-lib:client:progressForCancel",
 	minigameForCallback: "ai-lib:minigameFor",
-	zoneEvent: "ai-lib:client:zone"
+	zoneEvent: "ai-lib:client:zone",
+	modelPointEvent: "ai-lib:client:modelPoint"
 }, named = new Set();
 function registerExport(name, handler) {
 	named.add(name), globalThis.exports(name, handler);
@@ -952,7 +977,7 @@ function isNear(source, point, metres) {
 	return dx * dx + dy * dy + dz * dz <= metres * metres;
 }
 // ../../../packages/lib/src/server/gate.ts
-const core$17 = resourceExport(CORE.resource), log$6 = createLogger(GetCurrentResourceName()), isAdmin = (ace = ADMIN.ace) => (source) => !!IsPlayerAceAllowed(String(source), ace) || `not allowed (${ace})`, hasCharacter = () => (source) => core$17.GetCharacter(source) !== null || "no character loaded", near = (point, metres) => (source) => {
+const core$25 = resourceExport(CORE.resource), log$6 = createLogger(GetCurrentResourceName()), isAdmin = (ace = ADMIN.ace) => (source) => !!IsPlayerAceAllowed(String(source), ace) || `not allowed (${ace})`, hasCharacter = () => (source) => core$25.GetCharacter(source) !== null || "no character loaded", near = (point, metres) => (source) => {
 	let target = typeof point == "function" ? point(source) : point;
 	return target ? isNear(source, target, metres) || `too far (${metres} m)` : "no target point";
 }, gates = new Set();
@@ -1078,7 +1103,7 @@ function toPatch(value) {
 		default: return null;
 	}
 }
-const clone = (value) => value === void 0 ? value : JSON.parse(JSON.stringify(value)), core$16 = resourceExport(CORE.resource), ERR = {
+const clone = (value) => value === void 0 ? value : JSON.parse(JSON.stringify(value)), core$24 = resourceExport(CORE.resource), ERR = {
 	type: "ADMIN_ERR_TYPE",
 	range: "ADMIN_ERR_RANGE",
 	length: "ADMIN_ERR_LENGTH",
@@ -1092,7 +1117,7 @@ const clone = (value) => value === void 0 ? value : JSON.parse(JSON.stringify(va
 		if (cached && Date.now() - cached.at < 2e3) return cached.values.size > 0 ? cached.values : null;
 		let list = [];
 		try {
-			list = core$16.GetLookupValues(source);
+			list = core$24.GetLookupValues(source);
 		} catch {}
 		let values = new Set(Array.isArray(list) ? list.filter((v) => typeof v == "string") : []);
 		return this.lists.set(source, {
@@ -1357,7 +1382,7 @@ function writeSchema(resource, name, text, log) {
 	(0, node_fs_promises.mkdir)(dir, { recursive: !0 }).then(() => (0, node_fs_promises.writeFile)(`${dir}/${name}.schema.json`, text, "utf8")).catch((error) => log.error(`writing ${resource}/${path} failed`, error));
 }
 // ../../../packages/lib/src/server/admin/panel.ts
-const core$15 = resourceExport(CORE.resource);
+const core$23 = resourceExport(CORE.resource);
 var AdminPanel = class {
 	schema;
 	data = new Map();
@@ -1376,7 +1401,7 @@ var AdminPanel = class {
 		registerExport("AdminPanelSnapshot", () => this.snapshot()), registerExport("AdminPanelData", () => this.dataSnapshot()), registerExport("AdminPanelSummary", () => this.summary()), registerExport("AdminPanelApply", (admin, patch) => this.apply(admin, patch)), onClientCallback(ADMIN.worldChangesCallback(this.resource), () => Object.fromEntries(this.worldChanges), { rate: {
 			count: 4,
 			windowMs: 1e4
-		} }), setImmediate(() => core$15.RegisterAdminPanel(this.resource));
+		} }), setImmediate(() => core$23.RegisterAdminPanel(this.resource));
 	}
 	get(file) {
 		return this.data.get(file) ?? {};
@@ -1490,7 +1515,7 @@ var AdminPanel = class {
 		let spec = this.schema.files[file], data = this.get(file), value = key === void 0 ? data : data[key] ?? null;
 		this.dataFiles.get(file)?.write(data), this.views.changed(file, key, value);
 		for (let handler of this.handlers.get(file) ?? []) handler(key, value);
-		if (core$15.AdminPanelChanged({
+		if (core$23.AdminPanelChanged({
 			resource: this.resource,
 			file,
 			key,
@@ -1537,19 +1562,21 @@ function notify(source, text, kind = "info", duration) {
 	emitNet(LIB_UI.notifyEvent, source, notification);
 }
 // ../../../packages/lib/src/server/inventory.ts
-const core$14 = resourceExport(CORE.resource), inventory = {
-	addItem: (inv, item, count = 1, metadata, slot) => core$14.AddItem(inv, item, count, metadata, slot),
-	removeItem: (inv, item, count = 1, metadata, slot) => core$14.RemoveItem(inv, item, count, metadata, slot),
-	getItemCount: (inv, item, metadata) => core$14.GetItemCount(inv, item, metadata),
-	hasItem: (inv, item, count = 1) => core$14.HasItem(inv, item, count),
-	canCarryItem: (inv, item, count = 1, metadata) => core$14.CanCarryItem(inv, item, count, metadata),
-	getItems: (inv) => core$14.GetItems(inv),
-	clearInventory: (inv) => core$14.ClearInventory(inv),
-	registerStash: (name, label, slots, maxWeight, jobs = []) => core$14.RegisterStash(name, label, slots, maxWeight, jobs),
-	openInventory: (source, inv) => core$14.OpenInventory(source, inv),
-	registerUsableItem: (name, handler) => core$14.RegisterUsableItem(name, handler),
-	getItemDefinition: (name) => core$14.GetItemDefinition(name)
-}, core$13 = resourceExport(CORE.resource);
+const core$22 = resourceExport(CORE.resource), inventory = {
+	addItem: (inv, item, count = 1, metadata, slot) => core$22.AddItem(inv, item, count, metadata, slot),
+	removeItem: (inv, item, count = 1, metadata, slot) => core$22.RemoveItem(inv, item, count, metadata, slot),
+	getItemCount: (inv, item, metadata) => core$22.GetItemCount(inv, item, metadata),
+	hasItem: (inv, item, count = 1) => core$22.HasItem(inv, item, count),
+	canCarryItem: (inv, item, count = 1, metadata) => core$22.CanCarryItem(inv, item, count, metadata),
+	getItems: (inv) => core$22.GetItems(inv),
+	clearInventory: (inv) => core$22.ClearInventory(inv),
+	registerStash: (name, label, slots, maxWeight, jobs = []) => core$22.RegisterStash(name, label, slots, maxWeight, jobs),
+	openInventory: (source, inv) => core$22.OpenInventory(source, inv),
+	registerUsableItem: (name, handler) => core$22.RegisterUsableItem(name, handler),
+	registerShop: (name, label, items) => core$22.RegisterShop(name, label, items),
+	openShop: (source, name) => core$22.OpenShop(source, name),
+	getItemDefinition: (name) => core$22.GetItemDefinition(name)
+}, core$21 = resourceExport(CORE.resource);
 function reindex(index, source, before, after) {
 	for (let name of before) {
 		let set = index.get(name);
@@ -1577,11 +1604,11 @@ var OnlinePlayers = class {
 				gangs: [],
 				gangNames: [],
 				duty: null
-			}), this.setJobs(source, core$13.GetJobs(source) ?? []), this.setGangs(source, core$13.GetGangs(source) ?? []), this.setDuty(source, core$13.GetDutyJob(source));
+			}), this.setJobs(source, core$21.GetJobs(source) ?? []), this.setGangs(source, core$21.GetGangs(source) ?? []), this.setDuty(source, core$21.GetDutyJob(source));
 		};
 		on(CORE.playerLoadedEvent, load), on(CORE.playerUnloadedEvent, (source) => this.drop(source)), on(CORE.jobsChangedEvent, (source, jobs) => this.setJobs(source, jobs)), on(CORE.gangsChangedEvent, (source, gangs) => this.setGangs(source, gangs)), on(CORE.dutyChangedEvent, (source, job) => this.setDuty(source, job));
-		for (let source of core$13.GetLoadedSources()) {
-			let character = core$13.GetCharacter(source);
+		for (let source of core$21.GetLoadedSources()) {
+			let character = core$21.GetCharacter(source);
 			character && load(source, character);
 		}
 	}
@@ -1677,10 +1704,14 @@ var OnlinePlayers = class {
 		return this.start(), this.onDuty.get(job) ?? EMPTY;
 	}
 };
-const EMPTY = new Set(), online = new OnlinePlayers(), core$12 = resourceExport(CORE.resource), vehicleKeys = {
-	give: (source, vehicle, purpose = "temporary") => core$12.GiveVehicleKeys(source, vehicle, purpose),
-	remove: (source, vehicle) => core$12.RemoveVehicleKeys(source, vehicle),
-	has: (source, vehicle) => core$12.HasVehicleKeys(source, vehicle)
+const EMPTY = new Set(), online = new OnlinePlayers(), core$20 = resourceExport(CORE.resource), vehicleKeys = {
+	give: (source, vehicle, purpose = "temporary") => core$20.GiveVehicleKeys(source, vehicle, purpose),
+	remove: (source, vehicle) => core$20.RemoveVehicleKeys(source, vehicle),
+	has: (source, vehicle) => core$20.HasVehicleKeys(source, vehicle)
+}, core$19 = resourceExport(CORE.resource), fuel = {
+	get: (vehicle) => core$19.GetVehicleFuel(vehicle),
+	set: (vehicle, level) => core$19.SetVehicleFuel(vehicle, level),
+	provider: () => core$19.GetFuelSystem()
 }, TYPES = new Set([
 	"automobile",
 	"bike",
@@ -1726,7 +1757,7 @@ async function spawnVehicle(options) {
 	let plate = (options.plate ?? randomPlate()).slice(0, 8);
 	SetVehicleNumberPlateText(vehicle, plate), options.bucket !== void 0 && SetEntityRoutingBucket(vehicle, options.bucket), options.locked && SetVehicleDoorsLocked(vehicle, 2);
 	let state = Entity(vehicle).state;
-	options.fuel !== void 0 && state.set(VEHICLE_BAGS.fuel, options.fuel, !0), options.props && state.set(VEHICLE_BAGS.props, options.props, !0), options.setup && state.set(VEHICLE_BAGS.setup, options.setup, !0);
+	options.fuel !== void 0 && fuel.set(vehicle, options.fuel), options.props && state.set(VEHICLE_BAGS.props, options.props, !0), options.setup && state.set(VEHICLE_BAGS.setup, options.setup, !0);
 	for (let [key, value] of Object.entries(options.bags ?? {})) state.set(key, value, !0);
 	if (options.keysTo !== void 0) {
 		let synced = await waitFor(() => !DoesEntityExist(vehicle) || GetVehicleNumberPlateText(vehicle).trim() === plate.trim() || void 0, 3e3).catch(() => !1);
@@ -1771,7 +1802,7 @@ function vehicleNearPlayer(source, netId, options = {}) {
 	return Math.hypot(vx - px, vy - py, vz - pz) <= (options.metres ?? 5) ? vehicle : 0;
 }
 // ../../../packages/lib/src/server/proximity.ts
-const core$11 = resourceExport(CORE.resource);
+const core$18 = resourceExport(CORE.resource);
 function within(point, radius, candidates) {
 	let out = [];
 	for (let source of candidates) {
@@ -1781,16 +1812,16 @@ function within(point, radius, candidates) {
 	return out;
 }
 function playersNear(source, radius) {
-	return within(coordsOf(source), radius, [source, ...core$11.GetPlayersInScope(source)]);
+	return within(coordsOf(source), radius, [source, ...core$18.GetPlayersInScope(source)]);
 }
 function playersNearEntity(entity, radius) {
 	if (!DoesEntityExist(entity)) return [];
 	let owner = NetworkGetEntityOwner(entity);
-	return owner <= 0 ? [] : within(entityCoords(entity), radius, [owner, ...core$11.GetPlayersInScope(owner)]);
+	return owner <= 0 ? [] : within(entityCoords(entity), radius, [owner, ...core$18.GetPlayersInScope(owner)]);
 }
 function nearestPlayerTo(source, metres, filter) {
 	let from = coordsOf(source), best = null, bestDistance = metres;
-	for (let other of core$11.GetPlayersInScope(source)) {
+	for (let other of core$18.GetPlayersInScope(source)) {
 		if (other === source) continue;
 		let p = coordsOf(other), d = Math.hypot(p.x - from.x, p.y - from.y, p.z - from.z);
 		d > bestDistance || filter && !filter(other) || (best = other, bestDistance = d);
@@ -2148,7 +2179,7 @@ function progressFor(source, options) {
 	});
 }
 // ../../../packages/lib/src/server/definitions.ts
-const core$10 = resourceExport("ai-core"), definitions = new class {
+const core$17 = resourceExport("ai-core"), definitions = new class {
 	jobs = new Map();
 	gangs = new Map();
 	constructor() {
@@ -2158,11 +2189,11 @@ const core$10 = resourceExport("ai-core"), definitions = new class {
 	}
 	job(name) {
 		let def = this.jobs.get(name);
-		return def === void 0 && this.jobs.set(name, def = core$10.GetJobDefinition(name) ?? null), def;
+		return def === void 0 && this.jobs.set(name, def = core$17.GetJobDefinition(name) ?? null), def;
 	}
 	gang(name) {
 		let def = this.gangs.get(name);
-		return def === void 0 && this.gangs.set(name, def = core$10.GetGangDefinition(name) ?? null), def;
+		return def === void 0 && this.gangs.set(name, def = core$17.GetGangDefinition(name) ?? null), def;
 	}
 }();
 async function minigameFor(source, options) {
@@ -16952,41 +16983,77 @@ var GlobalGroup$1 = class extends Mirror {
 	}
 };
 // ../../../packages/lib/src/server/world.ts
-const core$9 = resourceExport(CORE.resource), world = {
-	getWeather: () => core$9.GetWeather(),
-	setWeather: (type) => core$9.SetWeather(type),
-	getTime: () => core$9.GetTime(),
-	setTime: (hour, minute = 0) => core$9.SetTime(hour, minute),
-	setBlackout: (on) => core$9.SetBlackout(on),
-	freezeTime: (on) => core$9.FreezeTime(on)
-}, core$8 = resourceExport(CORE.resource), prison = {
-	jail: (source, minutes, by = 0) => core$8.JailPlayer(source, minutes, by),
-	release: (source) => core$8.ReleasePlayer(source),
-	timeLeft: (source) => core$8.GetJailTime(source)
-}, core$7 = resourceExport(CORE.resource), phone = {
-	number: (source) => core$7.GetPhoneNumber(source),
-	sourceOf: (number) => core$7.GetSourceByPhone(number),
-	hasPhone: (source) => core$7.HasPhone(source),
-	mail: (to, mail) => core$7.SendPhoneMail(to, mail),
-	message: (from, to, text) => core$7.SendPhoneMessage(from, to, text),
-	notify: (source, notification) => core$7.PhoneNotify(source, notification)
-}, core$6 = resourceExport(CORE.resource), dispatch = { alert: (alert) => core$6.SendDispatchAlert(alert) }, core$5 = resourceExport(CORE.resource), money = { transfer: (from, to, amount, reason, fee) => core$5.TransferMoney(from, to, amount, reason, fee) }, core$4 = resourceExport(CORE.resource), buckets = {
-	acquire: (tag) => core$4.AcquireBucket(tag),
-	release: (id) => core$4.ReleaseBucket(id)
-}, core$3 = resourceExport(CORE.resource), medical = {
-	revive: (source) => core$3.RevivePlayer(source),
-	heal: (source) => core$3.HealPlayer(source),
-	isDead: (source) => core$3.IsPlayerDead(source),
-	provider: () => core$3.GetMedicalSystem()
-}, core$2 = resourceExport(CORE.resource), appearance = {
+const core$16 = resourceExport(CORE.resource), world = {
+	getWeather: () => core$16.GetWeather(),
+	setWeather: (type) => core$16.SetWeather(type),
+	getTime: () => core$16.GetTime(),
+	setTime: (hour, minute = 0) => core$16.SetTime(hour, minute),
+	setBlackout: (on) => core$16.SetBlackout(on),
+	freezeTime: (on) => core$16.FreezeTime(on)
+}, core$15 = resourceExport(CORE.resource), prison = {
+	jail: (source, minutes, by = 0) => core$15.JailPlayer(source, minutes, by),
+	release: (source) => core$15.ReleasePlayer(source),
+	timeLeft: (source) => core$15.GetJailTime(source)
+}, core$14 = resourceExport(CORE.resource), phone = {
+	number: (source) => core$14.GetPhoneNumber(source),
+	sourceOf: (number) => core$14.GetSourceByPhone(number),
+	hasPhone: (source) => core$14.HasPhone(source),
+	mail: (to, mail) => core$14.SendPhoneMail(to, mail),
+	message: (from, to, text) => core$14.SendPhoneMessage(from, to, text),
+	notify: (source, notification) => core$14.PhoneNotify(source, notification)
+}, core$13 = resourceExport(CORE.resource), dispatch = { alert: (alert) => core$13.SendDispatchAlert(alert) }, core$12 = resourceExport(CORE.resource), money = { transfer: (from, to, amount, reason, fee) => core$12.TransferMoney(from, to, amount, reason, fee) }, core$11 = resourceExport(CORE.resource), buckets = {
+	acquire: (tag) => core$11.AcquireBucket(tag),
+	release: (id) => core$11.ReleaseBucket(id)
+}, core$10 = resourceExport(CORE.resource), medical = {
+	revive: (source) => core$10.RevivePlayer(source),
+	heal: (source) => core$10.HealPlayer(source),
+	isDead: (source) => core$10.IsPlayerDead(source),
+	provider: () => core$10.GetMedicalSystem()
+}, core$9 = resourceExport(CORE.resource), billing = {
+	send: (bill) => core$9.SendBill(bill),
+	unpaid: (source) => new Promise((resolve) => core$9.GetUnpaidBills(source, resolve)),
+	pay: (source, id) => core$9.PayBill(source, id),
+	provider: () => core$9.GetBillingSystem()
+}, core$8 = resourceExport(CORE.resource), banking = {
+	open: (source) => core$8.OpenBank(source),
+	societyBalance: (job) => core$8.GetBankSocietyBalance(job),
+	provider: () => core$8.GetBankingSystem()
+}, core$7 = resourceExport(CORE.resource), mdt = {
+	record: (record) => core$7.AddMdtRecord(record),
+	provider: () => core$7.GetMdtSystem()
+}, core$6 = resourceExport(CORE.resource), ems = {
+	available: (jobs) => core$6.GetAvailableMedics(jobs),
+	distress: (source, call) => core$6.SendDistress(source, call),
+	provider: () => core$6.GetEmsSystem()
+}, core$5 = resourceExport(CORE.resource), appearance = {
 	get: (charId) => new Promise((resolve) => {
 		try {
-			core$2.GetCharacterAppearance(charId, (look) => resolve(toCharacterAppearance(look)));
+			core$5.GetCharacterAppearance(charId, (look) => resolve(toCharacterAppearance(look)));
 		} catch {
 			resolve(null);
 		}
 	}),
-	provider: () => core$2.GetAppearanceSystem()
+	provider: () => core$5.GetAppearanceSystem()
+}, core$4 = resourceExport(CORE.resource), stress = {
+	gain: (source, amount) => amount > 0 && core$4.AddStress(source, amount),
+	relieve: (source, amount) => amount > 0 && core$4.AddStress(source, -amount),
+	provider: () => core$4.GetStressSystem()
+}, core$3 = resourceExport(CORE.resource), doors = {
+	setLocked: (id, locked, by) => core$3.SetDoorLocked(id, locked, by),
+	isLocked: (id) => core$3.IsDoorLocked(id),
+	provider: () => core$3.GetDoorlockSystem()
+}, core$2 = resourceExport(CORE.resource), garages = {
+	impound: (vehicle, by) => core$2.ImpoundVehicle(vehicle, by),
+	store: (vehicle, garage, by) => core$2.StoreVehicleInGarage(vehicle, garage ?? null, by),
+	open: (source, garage) => core$2.OpenGarage(source, garage ?? null),
+	stored: (source) => new Promise((resolve) => {
+		try {
+			core$2.GetGaragedVehicles(source, (list) => resolve(toGaragedVehicles(list)));
+		} catch {
+			resolve(null);
+		}
+	}),
+	provider: () => core$2.GetGarageSystem()
 }, core$1 = resourceExport(CORE.resource), characters = { setOfflinePosition: (charId, position) => core$1.SetOfflinePosition(charId, position) }, core = resourceExport(CORE.resource), isPrimeTime = (job) => core.IsPrimeTime(job);
 // ../../../packages/lib/src/server/index.ts
 var server_exports = __exportAll({
@@ -17013,6 +17080,8 @@ var server_exports = __exportAll({
 	aiLog: () => aiLog,
 	aiLogChannels: () => aiLogChannels,
 	appearance: () => appearance,
+	banking: () => banking,
+	billing: () => billing,
 	buckets: () => buckets,
 	callExport: () => callExport,
 	caller: () => caller,
@@ -17022,10 +17091,14 @@ var server_exports = __exportAll({
 	createLocale: () => createLocale,
 	definitions: () => definitions,
 	dispatch: () => dispatch,
+	doors: () => doors,
+	ems: () => ems,
 	entityCoords: () => entityCoords,
 	entityFromNet: () => entityFromNet,
 	eventSource: () => eventSource,
 	every: () => every,
+	fuel: () => fuel,
+	garages: () => garages,
 	hasCharacter: () => hasCharacter,
 	inventory: () => inventory,
 	isAdmin: () => isAdmin,
@@ -17034,6 +17107,7 @@ var server_exports = __exportAll({
 	isPrimeTime: () => isPrimeTime,
 	isResourceStarted: () => isResourceStarted,
 	loadLocaleTexts: () => loadLocaleTexts,
+	mdt: () => mdt,
 	medical: () => medical,
 	minigameFor: () => minigameFor,
 	money: () => money,
@@ -17065,6 +17139,7 @@ var server_exports = __exportAll({
 	stateBoolean: () => stateBoolean,
 	stateNumber: () => stateNumber,
 	stateString: () => stateString,
+	stress: () => stress,
 	triggerClientCallback: () => triggerClientCallback,
 	vehicleFromNet: () => vehicleFromNet,
 	vehicleKeys: () => vehicleKeys,

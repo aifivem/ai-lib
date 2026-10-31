@@ -272,6 +272,48 @@ function readBlipStyle(value, fallback) {
 	};
 }
 // ../../../packages/lib/src/shared/zone.ts
+function readZoneShape(v) {
+	if (typeof v != "object" || !v) return null;
+	let s = v, num = (x) => typeof x == "number" && Number.isFinite(x), vec = (x) => {
+		if (typeof x != "object" || !x) return null;
+		let p = x;
+		return num(p.x) && num(p.y) && num(p.z) ? {
+			x: p.x,
+			y: p.y,
+			z: p.z
+		} : null;
+	};
+	if (s.type === "sphere" || s.type === "cylinder") {
+		let center = vec(s.center);
+		return !center || !num(s.radius) ? null : s.type === "sphere" ? {
+			type: "sphere",
+			center,
+			radius: s.radius
+		} : num(s.height) ? {
+			type: "cylinder",
+			center,
+			radius: s.radius,
+			height: s.height
+		} : null;
+	}
+	if (s.type !== "poly" || !Array.isArray(s.points) || !num(s.minZ) || !num(s.maxZ)) return null;
+	let points = [];
+	for (let p of s.points) {
+		if (typeof p != "object" || !p) return null;
+		let q = p;
+		if (!num(q.x) || !num(q.y)) return null;
+		points.push({
+			x: q.x,
+			y: q.y
+		});
+	}
+	return points.length >= 3 ? {
+		type: "poly",
+		points,
+		minZ: s.minZ,
+		maxZ: s.maxZ
+	} : null;
+}
 function zoneContains(shape, x, y, z) {
 	switch (shape.type) {
 		case "sphere": {
@@ -628,6 +670,7 @@ var shared_exports = __exportAll({
 	readText: () => readText,
 	readVec3: () => readVec3,
 	readVec4: () => readVec4,
+	readZoneShape: () => readZoneShape,
 	record: () => record,
 	replyError: () => replyError,
 	rollChance: () => rollChance,
@@ -840,7 +883,8 @@ const SKILL_STAGES = {
 	cancelProgressEvent: "ai-lib:client:cancelProgress",
 	progressForCallback: "ai-lib:progressFor",
 	progressForCancelEvent: "ai-lib:client:progressForCancel",
-	minigameForCallback: "ai-lib:minigameFor"
+	minigameForCallback: "ai-lib:minigameFor",
+	zoneEvent: "ai-lib:client:zone"
 }, named = new Set();
 function registerExport(name, handler) {
 	named.add(name), globalThis.exports(name, handler);

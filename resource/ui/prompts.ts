@@ -5,7 +5,12 @@ import {
   optionalExport,
   registerExport,
 } from "@aicore-fivem/lib/client";
-import { logSafe, readVec3, type Vec3 } from "@aicore-fivem/lib/shared";
+import {
+  isRecord,
+  logSafe,
+  readVec3,
+  type Vec3,
+} from "@aicore-fivem/lib/shared";
 import { LIB_UI } from "@aicore-fivem/shared";
 import Locale from "common/locale";
 import { NuiMessage } from "common/nui";
@@ -17,11 +22,51 @@ interface Prompt {
   id: string;
 }
 
-/** A prompt over a world point (a door) and where it was last sent on screen. */
+/** A spot on an entity, in the entity's own space (it moves and turns with it). */
+interface Anchor {
+  entity: number;
+  offset: Vec3;
+}
+
+/** A prompt over a world point or entity spots (a door) and where it was last sent on screen. */
 interface WorldPrompt {
-  at: Vec3;
+  at: Vec3 | null;
+  anchors: Anchor[] | null;
   x: number;
   y: number;
+}
+
+/** `{ x, y, z }` or `{ anchors: [{ entity, offset }] }` from another resource; null when it is neither. */
+function readAnchor(v: unknown): Pick<WorldPrompt, "at" | "anchors"> | null {
+  if (isRecord(v) && Array.isArray(v.anchors)) {
+    const anchors = v.anchors.flatMap((a): Anchor[] => {
+      if (!isRecord(a) || typeof a.entity !== "number") return [];
+      const offset = readVec3(a.offset);
+      return offset ? [{ entity: a.entity, offset }] : [];
+    });
+    return anchors.length ? { at: null, anchors } : null;
+  }
+  const at = readVec3(v);
+  return at ? { at, anchors: null } : null;
+}
+
+/** The world point of the anchor nearest the player (spots of entities that no longer exist are skipped). */
+function anchorPoint(anchors: Anchor[]): Vec3 | null {
+  const [px = 0, py = 0, pz = 0] = GetEntityCoords(PlayerPedId(), false);
+  let best: Vec3 | null = null;
+  let bestDist = Infinity;
+  for (const { entity, offset } of anchors) {
+    if (!DoesEntityExist(entity)) continue;
+    const [x = 0, y = 0, z = 0] = GetOffsetFromEntityInWorldCoords(
+      entity,
+      offset.x,
+      offset.y,
+      offset.z,
+    );
+    const dist = (x - px) ** 2 + (y - py) ** 2 + (z - pz) ** 2;
+    if (dist < bestDist) [best, bestDist] = [{ x, y, z }, dist];
+  }
+  return best;
 }
 
 /** Smaller moves than this (screen fraction) are not sent. */
@@ -48,11 +93,16 @@ class Prompts {
     onPressed: () => this.press(),
   });
 
-  show(resource: string, id: string, text: string, at: Vec3 | null): void {
+  show(
+    resource: string,
+    id: string,
+    text: string,
+    at: Pick<WorldPrompt, "at" | "anchors"> | null,
+  ): void {
     const key = `${resource}:${id}`;
     this.list.delete(key);
     this.list.set(key, { resource, id });
-    if (at) this.world.set(key, { at, x: -2, y: -2 });
+    if (at) this.world.set(key, { ...at, x: -2, y: -2 });
     else this.world.delete(key);
     this.follow.set(this.world.size > 0);
     // A key bound to a mouse button or pad comes back as an icon code; the letter is shown only for keyboard keys.
@@ -71,12 +121,10 @@ class Prompts {
   private place(): void {
     let moved: Array<[string, number, number]> | null = null;
     for (const [key, prompt] of this.world) {
-      const { x: wx, y: wy, z: wz } = prompt.at;
-      const [onScreen, sx = 0, sy = 0] = GetScreenCoordFromWorldCoord(
-        wx,
-        wy,
-        wz,
-      );
+      const point = prompt.anchors ? anchorPoint(prompt.anchors) : prompt.at;
+      const [onScreen, sx = 0, sy = 0] = point
+        ? GetScreenCoordFromWorldCoord(point.x, point.y, point.z)
+        : [false];
       const x = onScreen ? sx : -1;
       const y = onScreen ? sy : -1;
       if (
@@ -118,7 +166,7 @@ const prompts = new Prompts();
 
 registerExport("ShowPrompt", (id: unknown, text: unknown, at: unknown) => {
   if (typeof id === "string" && typeof text === "string")
-    prompts.show(caller(), id, text, at == null ? null : readVec3(at));
+    prompts.show(caller(), id, text, at == null ? null : readAnchor(at));
 });
 registerExport("HidePrompt", (id: unknown) => {
   if (typeof id === "string") prompts.hide(caller(), id);

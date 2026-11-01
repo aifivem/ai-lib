@@ -25,6 +25,6 @@ files {
 	'init.lua',
 	'lua/shared/*.lua',
 	'lua/client/*.lua',
-	'lua/client/*/*.lua',
+	'lua/client/**.lua',
 	'dist/client.js',
 }

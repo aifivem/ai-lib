@@ -1,6 +1,6 @@
 {
   "name": "ai-lib",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "private": true,
   "description": "The shared player UI (notifications, progress bar, prompts, menus, inputs, minigames) and the @aicore-fivem/lib helpers for resources that do not bundle it: @ai-lib/init.lua (Lua) or @ai-lib/dist/client.js / server.js (JavaScript)",
   "license": "GPL-3.0-only",

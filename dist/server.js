@@ -1592,6 +1592,12 @@ const core$24 = resourceExport(CORE.resource), inventory = {
 	registerShop: (name, label, items) => core$24.RegisterShop(name, label, items),
 	openShop: (source, name) => core$24.OpenShop(source, name),
 	getItemDefinition: (name) => core$24.GetItemDefinition(name),
+	itemsBySlot: (inv) => {
+		let out = {};
+		for (let stack of core$24.GetItems(inv) ?? []) out[stack.slot] = stack;
+		return out;
+	},
+	firstStack: (inv, item) => (core$24.GetItems(inv) ?? []).find((stack) => stack.name === item) ?? null,
 	getItemDefinitions: () => core$24.GetItemDefinitions() ?? {},
 	setItemMetadata: (inv, slot, metadata) => core$24.SetItemMetadata(inv, slot, metadata),
 	setMaxWeight: (source, grams) => core$24.SetMaxWeight(source, grams),
@@ -1612,6 +1618,7 @@ var OnlineMirror = class {
 	onDuty = new Map();
 	jobIndex = new Map();
 	gangIndex = new Map();
+	byCitizenid = new Map();
 	started = !1;
 	start() {
 		if (this.started) return;
@@ -1624,7 +1631,7 @@ var OnlineMirror = class {
 				gangs: [],
 				gangNames: [],
 				duty: null
-			}), this.setJobs(source, core$23.GetJobs(source) ?? []), this.setGangs(source, core$23.GetGangs(source) ?? []), this.setDuty(source, core$23.GetDutyJob(source));
+			}), this.byCitizenid.set(character.citizenid, source), this.setJobs(source, core$23.GetJobs(source) ?? []), this.setGangs(source, core$23.GetGangs(source) ?? []), this.setDuty(source, core$23.GetDutyJob(source));
 		};
 		on(CORE.playerLoadedEvent, load), on(CORE.playerUnloadedEvent, (source) => this.drop(source)), on(CORE.jobsChangedEvent, (source, jobs) => this.setJobs(source, jobs)), on(CORE.gangsChangedEvent, (source, gangs) => this.setGangs(source, gangs)), on(CORE.dutyChangedEvent, (source, job) => this.setDuty(source, job));
 		for (let source of core$23.GetLoadedSources()) {
@@ -1634,7 +1641,7 @@ var OnlineMirror = class {
 	}
 	drop(source) {
 		let player = this.players.get(source);
-		player && (this.setDuty(source, null), reindex(this.jobIndex, source, player.jobNames, []), reindex(this.gangIndex, source, player.gangNames, []), this.players.delete(source));
+		player && (this.setDuty(source, null), reindex(this.jobIndex, source, player.jobNames, []), reindex(this.gangIndex, source, player.gangNames, []), this.byCitizenid.delete(player.character.citizenid), this.players.delete(source));
 	}
 	setJobs(source, jobs) {
 		let player = this.players.get(source);
@@ -1668,6 +1675,15 @@ var OnlineMirror = class {
 	}
 	character(source) {
 		return this.start(), this.players.get(source)?.character ?? null;
+	}
+	sourceOf(citizenid) {
+		return this.start(), this.byCitizenid.get(citizenid) ?? null;
+	}
+	characters() {
+		this.start();
+		let out = new Map();
+		for (let [source, player] of this.players) out.set(source, player.character);
+		return out;
 	}
 	charId(source) {
 		return this.start(), this.players.get(source)?.character.id;

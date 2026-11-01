@@ -807,6 +807,9 @@ const CORE = {
 	activeGangChangedEvent: "ai-core:activeGangChanged",
 	metaChangedEvent: "ai-core:metaChanged",
 	definitionsChangedEvent: "ai-core:definitionsChanged",
+	characterDeletedEvent: "ai-core:characterDeleted",
+	runtimeJobPrefix: "ai:jobdef:",
+	runtimeGangPrefix: "ai:gangdef:",
 	characterScreenEvent: "ai-core:characterScreen",
 	inventoryChangedEvent: "ai-core:inventoryChanged",
 	itemUsedEvent: "ai-core:itemUsed",
@@ -837,7 +840,11 @@ const CORE = {
 	spawnEvent: "ai-core:client:spawn",
 	chooseSpawnEvent: "ai-core:client:chooseSpawn",
 	spawnChoiceCallback: "ai-core:spawnChoice",
-	openCharactersEvent: "ai-core:client:openCharacters"
+	openCharactersEvent: "ai-core:client:openCharacters",
+	characterScreenKey: "ai:characterScreen",
+	externalLoadedEvent: "ai-core:client:externalLoaded",
+	externalSpawnedEvent: "ai-core:externalSpawned",
+	externalLogoutEvent: "ai-core:client:externalLogout"
 };
 // ../../../packages/shared/src/garages.ts
 function toGaragedVehicles(raw) {
@@ -978,7 +985,7 @@ function isNear(source, point, metres) {
 	return dx * dx + dy * dy + dz * dz <= metres * metres;
 }
 // ../../../packages/lib/src/server/gate.ts
-const core$25 = resourceExport(CORE.resource), log$6 = createLogger(GetCurrentResourceName()), isAdmin = (ace = ADMIN.ace) => (source) => !!IsPlayerAceAllowed(String(source), ace) || `not allowed (${ace})`, hasCharacter = () => (source) => core$25.GetCharacter(source) !== null || "no character loaded", near = (point, metres) => (source) => {
+const core$26 = resourceExport(CORE.resource), log$6 = createLogger(GetCurrentResourceName()), isAdmin = (ace = ADMIN.ace) => (source) => !!IsPlayerAceAllowed(String(source), ace) || `not allowed (${ace})`, hasCharacter = () => (source) => core$26.GetCharacter(source) !== null || "no character loaded", near = (point, metres) => (source) => {
 	let target = typeof point == "function" ? point(source) : point;
 	return target ? isNear(source, target, metres) || `too far (${metres} m)` : "no target point";
 }, gates = new Set();
@@ -1104,7 +1111,7 @@ function toPatch(value) {
 		default: return null;
 	}
 }
-const clone = (value) => value === void 0 ? value : JSON.parse(JSON.stringify(value)), core$24 = resourceExport(CORE.resource), ERR = {
+const clone = (value) => value === void 0 ? value : JSON.parse(JSON.stringify(value)), core$25 = resourceExport(CORE.resource), ERR = {
 	type: "ADMIN_ERR_TYPE",
 	range: "ADMIN_ERR_RANGE",
 	length: "ADMIN_ERR_LENGTH",
@@ -1118,7 +1125,7 @@ const clone = (value) => value === void 0 ? value : JSON.parse(JSON.stringify(va
 		if (cached && Date.now() - cached.at < 2e3) return cached.values.size > 0 ? cached.values : null;
 		let list = [];
 		try {
-			list = core$24.GetLookupValues(source);
+			list = core$25.GetLookupValues(source);
 		} catch {}
 		let values = new Set(Array.isArray(list) ? list.filter((v) => typeof v == "string") : []);
 		return this.lists.set(source, {
@@ -1383,7 +1390,7 @@ function writeSchema(resource, name, text, log) {
 	(0, node_fs_promises.mkdir)(dir, { recursive: !0 }).then(() => (0, node_fs_promises.writeFile)(`${dir}/${name}.schema.json`, text, "utf8")).catch((error) => log.error(`writing ${resource}/${path} failed`, error));
 }
 // ../../../packages/lib/src/server/admin/panel.ts
-const core$23 = resourceExport(CORE.resource);
+const core$24 = resourceExport(CORE.resource);
 var AdminPanel = class {
 	schema;
 	data = new Map();
@@ -1402,7 +1409,7 @@ var AdminPanel = class {
 		registerExport("AdminPanelSnapshot", () => this.snapshot()), registerExport("AdminPanelData", () => this.dataSnapshot()), registerExport("AdminPanelSummary", () => this.summary()), registerExport("AdminPanelApply", (admin, patch) => this.apply(admin, patch)), onClientCallback(ADMIN.worldChangesCallback(this.resource), () => Object.fromEntries(this.worldChanges), { rate: {
 			count: 4,
 			windowMs: 1e4
-		} }), setImmediate(() => core$23.RegisterAdminPanel(this.resource));
+		} }), setImmediate(() => core$24.RegisterAdminPanel(this.resource));
 	}
 	get(file) {
 		return this.data.get(file) ?? {};
@@ -1516,7 +1523,7 @@ var AdminPanel = class {
 		let spec = this.schema.files[file], data = this.get(file), value = key === void 0 ? data : data[key] ?? null;
 		this.dataFiles.get(file)?.write(data), this.views.changed(file, key, value);
 		for (let handler of this.handlers.get(file) ?? []) handler(key, value);
-		if (core$23.AdminPanelChanged({
+		if (core$24.AdminPanelChanged({
 			resource: this.resource,
 			file,
 			key,
@@ -1554,30 +1561,34 @@ function aiLogChannels(channels) {
 	optionalExport("ai-core")?.LogChannels(channels);
 }
 // ../../../packages/lib/src/server/notify.ts
-function notify(source, text, kind = "info", duration) {
+function notify(source, text, kind = "info", duration, title) {
 	let notification = {
 		text,
 		kind,
-		duration
+		duration,
+		title
 	};
 	emitNet(LIB_UI.notifyEvent, source, notification);
 }
 // ../../../packages/lib/src/server/inventory.ts
-const core$22 = resourceExport(CORE.resource), inventory = {
-	addItem: (inv, item, count = 1, metadata, slot) => core$22.AddItem(inv, item, count, metadata, slot),
-	removeItem: (inv, item, count = 1, metadata, slot) => core$22.RemoveItem(inv, item, count, metadata, slot),
-	getItemCount: (inv, item, metadata) => core$22.GetItemCount(inv, item, metadata),
-	hasItem: (inv, item, count = 1) => core$22.HasItem(inv, item, count),
-	canCarryItem: (inv, item, count = 1, metadata) => core$22.CanCarryItem(inv, item, count, metadata),
-	getItems: (inv) => core$22.GetItems(inv),
-	clearInventory: (inv) => core$22.ClearInventory(inv),
-	registerStash: (name, label, slots, maxWeight, jobs = []) => core$22.RegisterStash(name, label, slots, maxWeight, jobs),
-	openInventory: (source, inv) => core$22.OpenInventory(source, inv),
-	registerUsableItem: (name, handler) => core$22.RegisterUsableItem(name, handler),
-	registerShop: (name, label, items) => core$22.RegisterShop(name, label, items),
-	openShop: (source, name) => core$22.OpenShop(source, name),
-	getItemDefinition: (name) => core$22.GetItemDefinition(name)
-}, core$21 = resourceExport(CORE.resource);
+const core$23 = resourceExport(CORE.resource), inventory = {
+	addItem: (inv, item, count = 1, metadata, slot) => core$23.AddItem(inv, item, count, metadata, slot),
+	removeItem: (inv, item, count = 1, metadata, slot) => core$23.RemoveItem(inv, item, count, metadata, slot),
+	getItemCount: (inv, item, metadata) => core$23.GetItemCount(inv, item, metadata),
+	hasItem: (inv, item, count = 1) => core$23.HasItem(inv, item, count),
+	canCarryItem: (inv, item, count = 1, metadata) => core$23.CanCarryItem(inv, item, count, metadata),
+	getItems: (inv) => core$23.GetItems(inv),
+	clearInventory: (inv) => core$23.ClearInventory(inv),
+	registerStash: (name, label, slots, maxWeight, jobs = []) => core$23.RegisterStash(name, label, slots, maxWeight, jobs),
+	openInventory: (source, inv) => core$23.OpenInventory(source, inv),
+	registerUsableItem: (name, handler) => core$23.RegisterUsableItem(name, handler),
+	registerShop: (name, label, items) => core$23.RegisterShop(name, label, items),
+	openShop: (source, name) => core$23.OpenShop(source, name),
+	getItemDefinition: (name) => core$23.GetItemDefinition(name),
+	setItemMetadata: (inv, slot, metadata) => core$23.SetItemMetadata(inv, slot, metadata),
+	setMaxWeight: (source, grams) => core$23.SetMaxWeight(source, grams),
+	usableItems: () => core$23.GetUsableItems()
+}, core$22 = resourceExport(CORE.resource);
 function reindex(index, source, before, after) {
 	for (let name of before) {
 		let set = index.get(name);
@@ -1605,11 +1616,11 @@ var OnlinePlayers = class {
 				gangs: [],
 				gangNames: [],
 				duty: null
-			}), this.setJobs(source, core$21.GetJobs(source) ?? []), this.setGangs(source, core$21.GetGangs(source) ?? []), this.setDuty(source, core$21.GetDutyJob(source));
+			}), this.setJobs(source, core$22.GetJobs(source) ?? []), this.setGangs(source, core$22.GetGangs(source) ?? []), this.setDuty(source, core$22.GetDutyJob(source));
 		};
 		on(CORE.playerLoadedEvent, load), on(CORE.playerUnloadedEvent, (source) => this.drop(source)), on(CORE.jobsChangedEvent, (source, jobs) => this.setJobs(source, jobs)), on(CORE.gangsChangedEvent, (source, gangs) => this.setGangs(source, gangs)), on(CORE.dutyChangedEvent, (source, job) => this.setDuty(source, job));
-		for (let source of core$21.GetLoadedSources()) {
-			let character = core$21.GetCharacter(source);
+		for (let source of core$22.GetLoadedSources()) {
+			let character = core$22.GetCharacter(source);
 			character && load(source, character);
 		}
 	}
@@ -1705,14 +1716,14 @@ var OnlinePlayers = class {
 		return this.start(), this.onDuty.get(job) ?? EMPTY;
 	}
 };
-const EMPTY = new Set(), online = new OnlinePlayers(), core$20 = resourceExport(CORE.resource), vehicleKeys = {
-	give: (source, vehicle, purpose = "temporary") => core$20.GiveVehicleKeys(source, vehicle, purpose),
-	remove: (source, vehicle) => core$20.RemoveVehicleKeys(source, vehicle),
-	has: (source, vehicle) => core$20.HasVehicleKeys(source, vehicle)
-}, core$19 = resourceExport(CORE.resource), fuel = {
-	get: (vehicle) => core$19.GetVehicleFuel(vehicle),
-	set: (vehicle, level) => core$19.SetVehicleFuel(vehicle, level),
-	provider: () => core$19.GetFuelSystem()
+const EMPTY = new Set(), online = new OnlinePlayers(), core$21 = resourceExport(CORE.resource), vehicleKeys = {
+	give: (source, vehicle, purpose = "temporary") => core$21.GiveVehicleKeys(source, vehicle, purpose),
+	remove: (source, vehicle) => core$21.RemoveVehicleKeys(source, vehicle),
+	has: (source, vehicle) => core$21.HasVehicleKeys(source, vehicle)
+}, core$20 = resourceExport(CORE.resource), fuel = {
+	get: (vehicle) => core$20.GetVehicleFuel(vehicle),
+	set: (vehicle, level) => core$20.SetVehicleFuel(vehicle, level),
+	provider: () => core$20.GetFuelSystem()
 }, TYPES = new Set([
 	"automobile",
 	"bike",
@@ -1722,14 +1733,14 @@ const EMPTY = new Set(), online = new OnlinePlayers(), core$20 = resourceExport(
 	"submarine",
 	"trailer",
 	"train"
-]), types = new Map(), votes = new Map();
+]), types = new Map(), votes = new Map(), modelHash = (model) => typeof model == "number" ? model | 0 : GetHashKey(model) | 0;
 async function vehicleType(model, asker) {
-	let known = types.get(model);
+	let hash = modelHash(model), known = types.get(hash);
 	if (known !== void 0) return known;
 	let answer = await triggerClientCallback(CORE.vehicleTypeCallback, asker, [model]).catch(() => null);
 	if (typeof answer != "string" || !TYPES.has(answer)) return null;
-	let seen = votes.get(model) ?? new Map(), first = seen.get(answer);
-	return first !== void 0 && first !== asker ? (types.set(model, answer), votes.delete(model)) : (seen.set(answer, asker), votes.set(model, seen)), answer;
+	let seen = votes.get(hash) ?? new Map(), first = seen.get(answer);
+	return first !== void 0 && first !== asker ? (types.set(hash, answer), votes.delete(hash)) : (seen.set(answer, asker), votes.set(hash, seen)), answer;
 }
 async function seatPlayer(vehicle, source, seat) {
 	let ped = GetPlayerPed(String(source));
@@ -1752,7 +1763,7 @@ function randomPlate(prefix) {
 async function spawnVehicle(options) {
 	let type = options.asker === void 0 ? options.type ?? "automobile" : await vehicleType(options.model, options.asker);
 	if (!type) return null;
-	let { x, y, z, heading } = options.coords, vehicle = CreateVehicleServerSetter(GetHashKey(options.model), type, x, y, z, heading);
+	let { x, y, z, heading } = options.coords, vehicle = CreateVehicleServerSetter(modelHash(options.model), type, x, y, z, heading);
 	if (!await waitFor(() => DoesEntityExist(vehicle) || void 0, 5e3).catch(() => !1)) return null;
 	options.persistent !== !1 && SetEntityOrphanMode(vehicle, 2);
 	let plate = (options.plate ?? randomPlate()).slice(0, 8);
@@ -1803,7 +1814,7 @@ function vehicleNearPlayer(source, netId, options = {}) {
 	return Math.hypot(vx - px, vy - py, vz - pz) <= (options.metres ?? 5) ? vehicle : 0;
 }
 // ../../../packages/lib/src/server/proximity.ts
-const core$18 = resourceExport(CORE.resource);
+const core$19 = resourceExport(CORE.resource);
 function within(point, radius, candidates) {
 	let out = [];
 	for (let source of candidates) {
@@ -1813,16 +1824,26 @@ function within(point, radius, candidates) {
 	return out;
 }
 function playersNear(source, radius) {
-	return within(coordsOf(source), radius, [source, ...core$18.GetPlayersInScope(source)]);
+	return within(coordsOf(source), radius, [source, ...core$19.GetPlayersInScope(source)]);
+}
+function playersNearCoords(coords, radius, bucket) {
+	let out = [], max = radius * radius;
+	for (let source of online.sources()) {
+		let id = String(source), ped = GetPlayerPed(id);
+		if (!ped) continue;
+		let [x = 0, y = 0, z = 0] = GetEntityCoords(ped), dx = x - coords.x, dy = y - coords.y, dz = z - coords.z;
+		dx * dx + dy * dy + dz * dz > max || (bucket === void 0 || GetPlayerRoutingBucket(id) === bucket) && out.push(source);
+	}
+	return out;
 }
 function playersNearEntity(entity, radius) {
 	if (!DoesEntityExist(entity)) return [];
 	let owner = NetworkGetEntityOwner(entity);
-	return owner <= 0 ? [] : within(entityCoords(entity), radius, [owner, ...core$18.GetPlayersInScope(owner)]);
+	return owner <= 0 ? [] : within(entityCoords(entity), radius, [owner, ...core$19.GetPlayersInScope(owner)]);
 }
 function nearestPlayerTo(source, metres, filter) {
 	let from = coordsOf(source), best = null, bestDistance = metres;
-	for (let other of core$18.GetPlayersInScope(source)) {
+	for (let other of core$19.GetPlayersInScope(source)) {
 		if (other === source) continue;
 		let p = coordsOf(other), d = Math.hypot(p.x - from.x, p.y - from.y, p.z - from.z);
 		d > bestDistance || filter && !filter(other) || (best = other, bestDistance = d);
@@ -2180,7 +2201,7 @@ function progressFor(source, options) {
 	});
 }
 // ../../../packages/lib/src/server/definitions.ts
-const core$17 = resourceExport("ai-core"), definitions = new class {
+const core$18 = resourceExport("ai-core"), definitions = new class {
 	jobs = new Map();
 	gangs = new Map();
 	constructor() {
@@ -2190,11 +2211,23 @@ const core$17 = resourceExport("ai-core"), definitions = new class {
 	}
 	job(name) {
 		let def = this.jobs.get(name);
-		return def === void 0 && this.jobs.set(name, def = core$17.GetJobDefinition(name) ?? null), def;
+		return def === void 0 && this.jobs.set(name, def = core$18.GetJobDefinition(name) ?? null), def;
+	}
+	registerJob(name, definition) {
+		return core$18.RegisterJobDefinition(name, definition);
+	}
+	removeJob(name) {
+		return core$18.RemoveJobDefinition(name);
+	}
+	registerGang(name, definition) {
+		return core$18.RegisterGangDefinition(name, definition);
+	}
+	removeGang(name) {
+		return core$18.RemoveGangDefinition(name);
 	}
 	gang(name) {
 		let def = this.gangs.get(name);
-		return def === void 0 && this.gangs.set(name, def = core$17.GetGangDefinition(name) ?? null), def;
+		return def === void 0 && this.gangs.set(name, def = core$18.GetGangDefinition(name) ?? null), def;
 	}
 }();
 async function minigameFor(source, options) {
@@ -16984,78 +17017,105 @@ var GlobalGroup$1 = class extends Mirror {
 	}
 };
 // ../../../packages/lib/src/server/world.ts
-const core$16 = resourceExport(CORE.resource), world = {
-	getWeather: () => core$16.GetWeather(),
-	setWeather: (type) => core$16.SetWeather(type),
-	getTime: () => core$16.GetTime(),
-	setTime: (hour, minute = 0) => core$16.SetTime(hour, minute),
-	setBlackout: (on) => core$16.SetBlackout(on),
-	freezeTime: (on) => core$16.FreezeTime(on)
-}, core$15 = resourceExport(CORE.resource), prison = {
-	jail: (source, minutes, by = 0) => core$15.JailPlayer(source, minutes, by),
-	release: (source) => core$15.ReleasePlayer(source),
-	timeLeft: (source) => core$15.GetJailTime(source)
-}, core$14 = resourceExport(CORE.resource), phone = {
-	number: (source) => core$14.GetPhoneNumber(source),
-	sourceOf: (number) => core$14.GetSourceByPhone(number),
-	hasPhone: (source) => core$14.HasPhone(source),
-	mail: (to, mail) => core$14.SendPhoneMail(to, mail),
-	message: (from, to, text) => core$14.SendPhoneMessage(from, to, text),
-	notify: (source, notification) => core$14.PhoneNotify(source, notification)
-}, core$13 = resourceExport(CORE.resource), dispatch = { alert: (alert) => core$13.SendDispatchAlert(alert) }, core$12 = resourceExport(CORE.resource), money = { transfer: (from, to, amount, reason, fee) => core$12.TransferMoney(from, to, amount, reason, fee) }, core$11 = resourceExport(CORE.resource), buckets = {
-	acquire: (tag) => core$11.AcquireBucket(tag),
-	release: (id) => core$11.ReleaseBucket(id)
-}, core$10 = resourceExport(CORE.resource), medical = {
-	revive: (source) => core$10.RevivePlayer(source),
-	heal: (source) => core$10.HealPlayer(source),
-	isDead: (source) => core$10.IsPlayerDead(source),
-	provider: () => core$10.GetMedicalSystem()
-}, core$9 = resourceExport(CORE.resource), billing = {
-	send: (bill) => core$9.SendBill(bill),
-	unpaid: (source) => new Promise((resolve) => core$9.GetUnpaidBills(source, resolve)),
-	pay: (source, id) => core$9.PayBill(source, id),
-	provider: () => core$9.GetBillingSystem()
-}, core$8 = resourceExport(CORE.resource), banking = {
-	open: (source) => core$8.OpenBank(source),
-	societyBalance: (job) => core$8.GetBankSocietyBalance(job),
-	provider: () => core$8.GetBankingSystem()
-}, core$7 = resourceExport(CORE.resource), mdt = {
-	record: (record) => core$7.AddMdtRecord(record),
-	provider: () => core$7.GetMdtSystem()
-}, core$6 = resourceExport(CORE.resource), ems = {
-	available: (jobs) => core$6.GetAvailableMedics(jobs),
-	distress: (source, call) => core$6.SendDistress(source, call),
-	provider: () => core$6.GetEmsSystem()
-}, core$5 = resourceExport(CORE.resource), appearance = {
+const core$17 = resourceExport(CORE.resource), world = {
+	getWeather: () => core$17.GetWeather(),
+	setWeather: (type) => core$17.SetWeather(type),
+	getTime: () => core$17.GetTime(),
+	setTime: (hour, minute = 0) => core$17.SetTime(hour, minute),
+	setBlackout: (on) => core$17.SetBlackout(on),
+	freezeTime: (on) => core$17.FreezeTime(on)
+}, core$16 = resourceExport(CORE.resource), prison = {
+	jail: (source, minutes, by = 0) => core$16.JailPlayer(source, minutes, by),
+	release: (source) => core$16.ReleasePlayer(source),
+	timeLeft: (source) => core$16.GetJailTime(source)
+}, core$15 = resourceExport(CORE.resource), phone = {
+	number: (source) => core$15.GetPhoneNumber(source),
+	sourceOf: (number) => core$15.GetSourceByPhone(number),
+	hasPhone: (source) => core$15.HasPhone(source),
+	mail: (to, mail) => core$15.SendPhoneMail(to, mail),
+	message: (from, to, text) => core$15.SendPhoneMessage(from, to, text),
+	notify: (source, notification) => core$15.PhoneNotify(source, notification)
+}, core$14 = resourceExport(CORE.resource), dispatch = { alert: (alert) => core$14.SendDispatchAlert(alert) }, core$13 = resourceExport(CORE.resource), money = { transfer: (from, to, amount, reason, fee) => core$13.TransferMoney(from, to, amount, reason, fee) }, core$12 = resourceExport(CORE.resource), buckets = {
+	acquire: (tag) => core$12.AcquireBucket(tag),
+	release: (id) => core$12.ReleaseBucket(id)
+}, core$11 = resourceExport(CORE.resource), medical = {
+	revive: (source) => core$11.RevivePlayer(source),
+	heal: (source) => core$11.HealPlayer(source),
+	isDead: (source) => core$11.IsPlayerDead(source),
+	provider: () => core$11.GetMedicalSystem()
+}, core$10 = resourceExport(CORE.resource), billing = {
+	send: (bill) => core$10.SendBill(bill),
+	unpaid: (source) => new Promise((resolve) => core$10.GetUnpaidBills(source, resolve)),
+	pay: (source, id) => core$10.PayBill(source, id),
+	provider: () => core$10.GetBillingSystem()
+}, core$9 = resourceExport(CORE.resource), banking = {
+	open: (source) => core$9.OpenBank(source),
+	societyBalance: (job) => core$9.GetBankSocietyBalance(job),
+	provider: () => core$9.GetBankingSystem()
+}, core$8 = resourceExport(CORE.resource), mdt = {
+	record: (record) => core$8.AddMdtRecord(record),
+	provider: () => core$8.GetMdtSystem()
+}, core$7 = resourceExport(CORE.resource), ems = {
+	available: (jobs) => core$7.GetAvailableMedics(jobs),
+	distress: (source, call) => core$7.SendDistress(source, call),
+	provider: () => core$7.GetEmsSystem()
+}, core$6 = resourceExport(CORE.resource), appearance = {
 	get: (charId) => new Promise((resolve) => {
 		try {
-			core$5.GetCharacterAppearance(charId, (look) => resolve(toCharacterAppearance(look)));
+			core$6.GetCharacterAppearance(charId, (look) => resolve(toCharacterAppearance(look)));
 		} catch {
 			resolve(null);
 		}
 	}),
-	provider: () => core$5.GetAppearanceSystem()
-}, core$4 = resourceExport(CORE.resource), stress = {
-	gain: (source, amount) => amount > 0 && core$4.AddStress(source, amount),
-	relieve: (source, amount) => amount > 0 && core$4.AddStress(source, -amount),
-	provider: () => core$4.GetStressSystem()
-}, needs = { refill: (source) => core$4.RefillNeeds(source) }, core$3 = resourceExport(CORE.resource), doors = {
-	setLocked: (id, locked, by) => core$3.SetDoorLocked(id, locked, by),
-	isLocked: (id) => core$3.IsDoorLocked(id),
-	provider: () => core$3.GetDoorlockSystem()
-}, core$2 = resourceExport(CORE.resource), garages = {
-	impound: (vehicle, by) => core$2.ImpoundVehicle(vehicle, by),
-	store: (vehicle, garage, by) => core$2.StoreVehicleInGarage(vehicle, garage ?? null, by),
-	open: (source, garage) => core$2.OpenGarage(source, garage ?? null),
+	provider: () => core$6.GetAppearanceSystem()
+}, core$5 = resourceExport(CORE.resource), stress = {
+	gain: (source, amount) => amount > 0 && core$5.AddStress(source, amount),
+	relieve: (source, amount) => amount > 0 && core$5.AddStress(source, -amount),
+	provider: () => core$5.GetStressSystem()
+}, needs = { refill: (source) => core$5.RefillNeeds(source) }, core$4 = resourceExport(CORE.resource), doors = {
+	setLocked: (id, locked, by) => core$4.SetDoorLocked(id, locked, by),
+	isLocked: (id) => core$4.IsDoorLocked(id),
+	provider: () => core$4.GetDoorlockSystem()
+}, core$3 = resourceExport(CORE.resource), garages = {
+	impound: (vehicle, by) => core$3.ImpoundVehicle(vehicle, by),
+	store: (vehicle, garage, by) => core$3.StoreVehicleInGarage(vehicle, garage ?? null, by),
+	open: (source, garage) => core$3.OpenGarage(source, garage ?? null),
 	stored: (source) => new Promise((resolve) => {
 		try {
-			core$2.GetGaragedVehicles(source, (list) => resolve(toGaragedVehicles(list)));
+			core$3.GetGaragedVehicles(source, (list) => resolve(toGaragedVehicles(list)));
 		} catch {
 			resolve(null);
 		}
 	}),
-	provider: () => core$2.GetGarageSystem()
-}, core$1 = resourceExport(CORE.resource), characters = { setOfflinePosition: (charId, position) => core$1.SetOfflinePosition(charId, position) }, core = resourceExport(CORE.resource), isPrimeTime = (job) => core.IsPrimeTime(job);
+	provider: () => core$3.GetGarageSystem()
+}, core$2 = resourceExport(CORE.resource), ask = (call) => new Promise((resolve) => call(resolve)), characters = {
+	setOfflinePosition: (charId, position) => core$2.SetOfflinePosition(charId, position),
+	get: (charId) => ask((done) => core$2.GetOfflineCharacter(charId, done)),
+	ofUser: (user) => ask((done) => core$2.GetCharactersOfUser(user, done)),
+	jobMembers: (job, after, limit) => ask((done) => core$2.GetJobMembers(job, done, after, limit)),
+	gangMembers: (gang, after, limit) => ask((done) => core$2.GetGangMembers(gang, done, after, limit)),
+	addMoney: (charId, account, amount, reason) => ask((done) => core$2.AddOfflineMoney(charId, account, amount, reason, done)),
+	removeMoney: (charId, account, amount, reason) => ask((done) => core$2.RemoveOfflineMoney(charId, account, amount, reason, done)),
+	setMoney: (charId, account, amount, reason) => ask((done) => core$2.SetOfflineMoney(charId, account, amount, reason, done)),
+	setJob: (charId, job, grade) => ask((done) => core$2.SetOfflineJob(charId, job, grade, done)),
+	removeJob: (charId, job) => ask((done) => core$2.RemoveOfflineJob(charId, job, done)),
+	setGang: (charId, gang, grade) => ask((done) => core$2.SetOfflineGang(charId, gang, grade, done)),
+	removeGang: (charId, gang) => ask((done) => core$2.RemoveOfflineGang(charId, gang, done)),
+	setMeta: (charId, key, value) => ask((done) => core$2.SetOfflineMeta(charId, key, value, done)),
+	setInfo: (charId, patch) => ask((done) => core$2.SetCharacterInfo(charId, patch, done)),
+	remove: (charId, by) => ask((done) => core$2.DeleteCharacter(charId, by, done)),
+	playTime: (target) => ask((done) => core$2.GetPlayTime(target, done)),
+	save: (source) => ask((done) => core$2.SavePlayer(source, done)),
+	setPaycheck: (source, on) => core$2.SetPaycheckEnabled(source, on),
+	isPaid: (source) => core$2.IsPaycheckEnabled(source)
+}, core$1 = resourceExport(CORE.resource), bans = {
+	ban: (target, reason, minutes, by) => new Promise((resolve) => {
+		core$1.BanPlayer(target, reason, minutes, by, resolve) || resolve(null);
+	}),
+	unban: (banId, by) => core$1.UnbanPlayer(banId, by),
+	isBanned: (target) => core$1.IsBanned(target),
+	list: (page = 1) => core$1.GetBans(page)
+}, core = resourceExport(CORE.resource), isPrimeTime = (job) => core.IsPrimeTime(job);
 // ../../../packages/lib/src/server/index.ts
 var server_exports = __exportAll({
 	AdminPanel: () => AdminPanel,
@@ -17082,6 +17142,7 @@ var server_exports = __exportAll({
 	aiLogChannels: () => aiLogChannels,
 	appearance: () => appearance,
 	banking: () => banking,
+	bans: () => bans,
 	billing: () => billing,
 	buckets: () => buckets,
 	callExport: () => callExport,
@@ -17129,6 +17190,7 @@ var server_exports = __exportAll({
 	phone: () => phone,
 	plateOf: () => plateOf,
 	playersNear: () => playersNear,
+	playersNearCoords: () => playersNearCoords,
 	playersNearEntity: () => playersNearEntity,
 	prison: () => prison,
 	progressFor: () => progressFor,

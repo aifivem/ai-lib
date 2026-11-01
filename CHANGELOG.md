@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.4.0](https://github.com/aifivem/ai-lib/compare/v0.3.0...v0.4.0) (2026-11-01)
+
+
+### New Features
+
+* **lib:** Lua inventory.items and inventory.onCount ([ca53d60](https://github.com/aifivem/ai-lib/commit/ca53d60bf5694f02f102ddef4b2f7789b2be10d9))
+* **lib:** Lua item definition lists ([0841eff](https://github.com/aifivem/ai-lib/commit/0841eff2602ead816a787401806194060b8c925a))
+* **lib:** Lua money, jobs, characters, definitions, fuel, medical, doors, garages, buckets, bans, prime time and needs ([805df56](https://github.com/aifivem/ai-lib/commit/805df56888daf620fa66a0f3cb88756a7baa5303))
+* **lib:** Lua needs.add ([ae849cc](https://github.com/aifivem/ai-lib/commit/ae849cc2aa744d3dc2fd8ee53b2e6dbffd11c6a0))
+* **lib:** Lua online.sourceOf / characters, inventory itemsBySlot / firstStack ([9c2ac5f](https://github.com/aifivem/ai-lib/commit/9c2ac5f6320a3fa57dbab139c439ead34722e8c9))
+* **lua:** inventory.canCarryItems, jobs.unemployed and characters.hasJobMember ([ad8d292](https://github.com/aifivem/ai-lib/commit/ad8d292e00ba76389b7569cf16de71ec0b85e8a6))
+
 ## [0.3.0](https://github.com/aifivem/ai-lib/compare/v0.2.1...v0.3.0) (2026-11-01)
 
 

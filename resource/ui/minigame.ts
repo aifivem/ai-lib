@@ -10,7 +10,7 @@ import {
   type SkillStage,
 } from "@aicore-fivem/shared";
 import Locale from "common/locale";
-import { dialogs } from "./dialogs";
+import { dialogs } from "./dialogs/dialogs";
 
 const ResourceName = GetCurrentResourceName();
 

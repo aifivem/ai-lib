@@ -1,5 +1,5 @@
 import type { MenuRequest } from "@aicore-fivem/shared";
-import type { MinigameMessage } from "../features/dialogs/Minigames";
+import type { MinigameMessage } from "../features/minigames/types";
 
 /** Browser preview only: `?view=menu` shows a job menu. */
 export const MENU_MOCK: MenuRequest | undefined =

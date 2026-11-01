@@ -862,7 +862,7 @@ function toGaragedVehicles(raw) {
 	}
 	return list;
 }
-// ../../../packages/shared/src/admin.ts
+// ../../../packages/shared/src/admin/events.ts
 const ADMIN = {
 	ace: "ai.admin",
 	openCallback: "ai-core:admin:open",
@@ -985,7 +985,7 @@ function isNear(source, point, metres) {
 	return dx * dx + dy * dy + dz * dz <= metres * metres;
 }
 // ../../../packages/lib/src/server/gate.ts
-const core$26 = resourceExport(CORE.resource), log$6 = createLogger(GetCurrentResourceName()), isAdmin = (ace = ADMIN.ace) => (source) => !!IsPlayerAceAllowed(String(source), ace) || `not allowed (${ace})`, hasCharacter = () => (source) => core$26.GetCharacter(source) !== null || "no character loaded", near = (point, metres) => (source) => {
+const core$27 = resourceExport(CORE.resource), log$6 = createLogger(GetCurrentResourceName()), isAdmin = (ace = ADMIN.ace) => (source) => !!IsPlayerAceAllowed(String(source), ace) || `not allowed (${ace})`, hasCharacter = () => (source) => core$27.GetCharacter(source) !== null || "no character loaded", near = (point, metres) => (source) => {
 	let target = typeof point == "function" ? point(source) : point;
 	return target ? isNear(source, target, metres) || `too far (${metres} m)` : "no target point";
 }, gates = new Set();
@@ -1033,7 +1033,7 @@ var ClientGate = class {
 	}
 };
 // ../../../packages/lib/src/server/callback.ts
-const log$5 = createLogger(GetCurrentResourceName()), resource$4 = GetCurrentResourceName(), REFUSED = Symbol("refused");
+const log$5 = createLogger(GetCurrentResourceName()), resource$5 = GetCurrentResourceName(), REFUSED = Symbol("refused");
 function onClientCallback(name, first, second) {
 	let [handler, options] = typeof first == "function" ? [first, second ?? {}] : [second, first], gate = new ClientGate(name, options, 20);
 	onNet(requestEvent(name), async (caller, id, ...raw) => {
@@ -1051,7 +1051,7 @@ function onClientCallback(name, first, second) {
 }
 const pending$1 = new Map();
 let nextId = 0;
-onNet(responseEvent(resource$4), (id, ok, result) => {
+onNet(responseEvent(resource$5), (id, ok, result) => {
 	let entry = typeof id == "number" ? pending$1.get(id) : void 0;
 	entry && entry.source === Number(globalThis.source) && (pending$1.delete(id), clearTimeout(entry.timer), ok === !0 ? entry.resolve(result) : entry.reject(Error("client callback failed")));
 });
@@ -1066,7 +1066,7 @@ function triggerClientCallback(name, source, args = [], timeoutMs = 3e4) {
 			resolve,
 			reject,
 			timer
-		}), emitNet(requestEvent(name), source, resource$4, id, ...args);
+		}), emitNet(requestEvent(name), source, resource$5, id, ...args);
 	});
 }
 // ../../../packages/lib/src/server/admin/patch.ts
@@ -1111,7 +1111,7 @@ function toPatch(value) {
 		default: return null;
 	}
 }
-const clone = (value) => value === void 0 ? value : JSON.parse(JSON.stringify(value)), core$25 = resourceExport(CORE.resource), ERR = {
+const clone = (value) => value === void 0 ? value : JSON.parse(JSON.stringify(value)), core$26 = resourceExport(CORE.resource), ERR = {
 	type: "ADMIN_ERR_TYPE",
 	range: "ADMIN_ERR_RANGE",
 	length: "ADMIN_ERR_LENGTH",
@@ -1125,7 +1125,7 @@ const clone = (value) => value === void 0 ? value : JSON.parse(JSON.stringify(va
 		if (cached && Date.now() - cached.at < 2e3) return cached.values.size > 0 ? cached.values : null;
 		let list = [];
 		try {
-			list = core$25.GetLookupValues(source);
+			list = core$26.GetLookupValues(source);
 		} catch {}
 		let values = new Set(Array.isArray(list) ? list.filter((v) => typeof v == "string") : []);
 		return this.lists.set(source, {
@@ -1254,11 +1254,7 @@ function applyEdit(data, patch, spec) {
 	}
 	return [spec.kind === "records" ? patch.key : void 0];
 }
-// ../../../packages/lib/src/server/admin/jsonSchema.ts
-const SCHEMA_KEY = {
-	type: "string",
-	description: "This file's JSON Schema (for editors)."
-};
+// ../../../packages/lib/src/server/admin/descriptions.ts
 function langFile(resource) {
 	try {
 		let raw = JSON.parse(LoadResourceFile(resource, "locales/en.json") ?? "{}");
@@ -1285,6 +1281,11 @@ function describe(schema, file, lang) {
 	for (let tab of schema.tabs) if (tab.file === file) for (let card of tab.cards) collect(card.fields, "", lang, out);
 	return out;
 }
+// ../../../packages/lib/src/server/admin/jsonSchema.ts
+const SCHEMA_KEY = {
+	type: "string",
+	description: "This file's JSON Schema (for editors)."
+};
 function toJson(spec, path, desc) {
 	let description = desc.get(path), base = description ? { description } : {};
 	switch (spec.type) {
@@ -1389,27 +1390,20 @@ function writeSchema(resource, name, text, log) {
 	let dir = `${GetResourcePath(resource)}/data/schemas`;
 	(0, node_fs_promises.mkdir)(dir, { recursive: !0 }).then(() => (0, node_fs_promises.writeFile)(`${dir}/${name}.schema.json`, text, "utf8")).catch((error) => log.error(`writing ${resource}/${path} failed`, error));
 }
-// ../../../packages/lib/src/server/admin/panel.ts
-const core$24 = resourceExport(CORE.resource);
-var AdminPanel = class {
+// ../../../packages/lib/src/server/admin/panelFiles.ts
+const core$25 = resourceExport(CORE.resource);
+var PanelFiles = class {
 	schema;
 	data = new Map();
 	dataFiles = new Map();
 	handlers = new Map();
-	rules = new Map();
-	actions = new Map();
 	views = new FileViews((file) => this.get(file));
 	worldChanges = new Map();
 	resource = GetCurrentResourceName();
 	log = createLogger(this.resource);
-	editor = 0;
 	constructor(schema) {
 		this.schema = schema;
 		for (let [name, spec] of Object.entries(schema.files)) this.load(name, spec);
-		registerExport("AdminPanelSnapshot", () => this.snapshot()), registerExport("AdminPanelData", () => this.dataSnapshot()), registerExport("AdminPanelSummary", () => this.summary()), registerExport("AdminPanelApply", (admin, patch) => this.apply(admin, patch)), onClientCallback(ADMIN.worldChangesCallback(this.resource), () => Object.fromEntries(this.worldChanges), { rate: {
-			count: 4,
-			windowMs: 1e4
-		} }), setImmediate(() => core$24.RegisterAdminPanel(this.resource));
 	}
 	get(file) {
 		return this.data.get(file) ?? {};
@@ -1417,17 +1411,68 @@ var AdminPanel = class {
 	onChange(file, handler) {
 		this.handlers.set(file, [...this.handlers.get(file) ?? [], handler]);
 	}
-	rule(file, rule) {
-		this.rules.set(file, rule);
-	}
-	onAction(id, handler) {
-		this.actions.set(id, handler);
-	}
 	view(file, read) {
 		return this.views.view(file, read);
 	}
 	records(file, readOne) {
 		return this.views.records(file, readOne);
+	}
+	commit(file, key, value) {
+		let data = this.data.get(file);
+		data && (key === void 0 ? isRecord(value) && this.data.set(file, clone(value)) : value === null ? delete data[key] : data[key] = clone(value), this.changed(file, key));
+	}
+	commitAfter(file, key, value) {
+		setImmediate(() => this.commit(file, key, value));
+	}
+	store(patch, spec) {
+		let data = this.data.get(patch.file) ?? {}, keys = applyEdit(data, patch, spec);
+		if (keys.length !== 0) {
+			this.data.set(patch.file, data);
+			for (let key of keys) this.changed(patch.file, key);
+		}
+	}
+	changed(file, key) {
+		let spec = this.schema.files[file], data = this.get(file), value = key === void 0 ? data : data[key] ?? null;
+		this.dataFiles.get(file)?.write(data), this.views.changed(file, key, value);
+		for (let handler of this.handlers.get(file) ?? []) handler(key, value);
+		if (core$25.AdminPanelChanged({
+			resource: this.resource,
+			file,
+			key,
+			value: clone(value)
+		}), spec?.sync !== "all") return;
+		let changes = this.worldChanges.get(file) ?? {};
+		changes[key ?? ""] = clone(value), this.worldChanges.set(file, changes), emitNet(ADMIN.worldEvent(this.resource), -1, file, key ?? null, value);
+	}
+	load(name, spec) {
+		if (spec.memory) {
+			this.data.set(name, {});
+			return;
+		}
+		let file = new DataFile(this.resource, name, this.log);
+		this.dataFiles.set(name, file), file.schemaRef = `./schemas/${name}.schema.json`, writeSchema(this.resource, name, fileSchema(this.resource, this.schema, name, spec), this.log);
+		let raw = file.read(), data = isRecord(raw) ? raw : {}, filled = !1;
+		if (spec.kind === "settings") for (let [section, value] of Object.entries(spec.defaults ?? {})) section in data || (data[section] = clone(value), filled = !0);
+		this.data.set(name, data), (filled || raw === null || !file.hasSchemaRef()) && file.write(data);
+	}
+};
+// ../../../packages/lib/src/server/admin/panel.ts
+const core$24 = resourceExport(CORE.resource);
+var AdminPanel = class extends PanelFiles {
+	rules = new Map();
+	actions = new Map();
+	editor = 0;
+	constructor(schema) {
+		super(schema), registerExport("AdminPanelSnapshot", () => this.snapshot()), registerExport("AdminPanelData", () => this.dataSnapshot()), registerExport("AdminPanelSummary", () => this.summary()), registerExport("AdminPanelApply", (admin, patch) => this.apply(admin, patch)), onClientCallback(ADMIN.worldChangesCallback(this.resource), () => Object.fromEntries(this.worldChanges), { rate: {
+			count: 4,
+			windowMs: 1e4
+		} }), setImmediate(() => core$24.RegisterAdminPanel(this.resource));
+	}
+	rule(file, rule) {
+		this.rules.set(file, rule);
+	}
+	onAction(id, handler) {
+		this.actions.set(id, handler);
 	}
 	snapshot() {
 		return {
@@ -1505,44 +1550,6 @@ var AdminPanel = class {
 			};
 		}
 	}
-	commit(file, key, value) {
-		let data = this.data.get(file);
-		data && (key === void 0 ? isRecord(value) && this.data.set(file, clone(value)) : value === null ? delete data[key] : data[key] = clone(value), this.changed(file, key));
-	}
-	commitAfter(file, key, value) {
-		setImmediate(() => this.commit(file, key, value));
-	}
-	store(patch, spec) {
-		let data = this.data.get(patch.file) ?? {}, keys = applyEdit(data, patch, spec);
-		if (keys.length !== 0) {
-			this.data.set(patch.file, data);
-			for (let key of keys) this.changed(patch.file, key);
-		}
-	}
-	changed(file, key) {
-		let spec = this.schema.files[file], data = this.get(file), value = key === void 0 ? data : data[key] ?? null;
-		this.dataFiles.get(file)?.write(data), this.views.changed(file, key, value);
-		for (let handler of this.handlers.get(file) ?? []) handler(key, value);
-		if (core$24.AdminPanelChanged({
-			resource: this.resource,
-			file,
-			key,
-			value: clone(value)
-		}), spec?.sync !== "all") return;
-		let changes = this.worldChanges.get(file) ?? {};
-		changes[key ?? ""] = clone(value), this.worldChanges.set(file, changes), emitNet(ADMIN.worldEvent(this.resource), -1, file, key ?? null, value);
-	}
-	load(name, spec) {
-		if (spec.memory) {
-			this.data.set(name, {});
-			return;
-		}
-		let file = new DataFile(this.resource, name, this.log);
-		this.dataFiles.set(name, file), file.schemaRef = `./schemas/${name}.schema.json`, writeSchema(this.resource, name, fileSchema(this.resource, this.schema, name, spec), this.log);
-		let raw = file.read(), data = isRecord(raw) ? raw : {}, filled = !1;
-		if (spec.kind === "settings") for (let [section, value] of Object.entries(spec.defaults ?? {})) section in data || (data[section] = clone(value), filled = !0);
-		this.data.set(name, data), (filled || raw === null || !file.hasSchemaRef()) && file.write(data);
-	}
 };
 function labelOf(record, path) {
 	if (!path) return null;
@@ -1599,7 +1606,7 @@ function reindex(index, source, before, after) {
 		set || index.set(name, set = new Set()), set.add(source);
 	}
 }
-var OnlinePlayers = class {
+var OnlineMirror = class {
 	players = new Map();
 	onDuty = new Map();
 	jobIndex = new Map();
@@ -1651,6 +1658,7 @@ var OnlinePlayers = class {
 		let set = this.onDuty.get(job);
 		set || this.onDuty.set(job, set = new Set()), set.add(source);
 	}
+}, OnlinePlayers = class extends OnlineMirror {
 	sources() {
 		return this.start(), this.players.keys();
 	}
@@ -1720,10 +1728,6 @@ const EMPTY = new Set(), online = new OnlinePlayers(), core$21 = resourceExport(
 	give: (source, vehicle, purpose = "temporary") => core$21.GiveVehicleKeys(source, vehicle, purpose),
 	remove: (source, vehicle) => core$21.RemoveVehicleKeys(source, vehicle),
 	has: (source, vehicle) => core$21.HasVehicleKeys(source, vehicle)
-}, core$20 = resourceExport(CORE.resource), fuel = {
-	get: (vehicle) => core$20.GetVehicleFuel(vehicle),
-	set: (vehicle, level) => core$20.SetVehicleFuel(vehicle, level),
-	provider: () => core$20.GetFuelSystem()
 }, TYPES = new Set([
 	"automobile",
 	"bike",
@@ -1742,14 +1746,12 @@ async function vehicleType(model, asker) {
 	let seen = votes.get(hash) ?? new Map(), first = seen.get(answer);
 	return first !== void 0 && first !== asker ? (types.set(hash, answer), votes.delete(hash)) : (seen.set(answer, asker), votes.set(hash, seen)), answer;
 }
-async function seatPlayer(vehicle, source, seat) {
-	let ped = GetPlayerPed(String(source));
-	return ped ? waitFor(() => {
-		if (!DoesEntityExist(vehicle)) return !1;
-		if (GetPedInVehicleSeat(vehicle, seat) === ped) return !0;
-		SetPedIntoVehicle(ped, vehicle, seat);
-	}, 2e3, 150).catch(() => !1) : !1;
-}
+// ../../../packages/lib/src/server/fuel.ts
+const core$20 = resourceExport(CORE.resource), fuel = {
+	get: (vehicle) => core$20.GetVehicleFuel(vehicle),
+	set: (vehicle, level) => core$20.SetVehicleFuel(vehicle, level),
+	provider: () => core$20.GetFuelSystem()
+};
 function randomPlate(prefix) {
 	let digit = () => String(Math.floor(Math.random() * 10));
 	if (prefix !== void 0) {
@@ -1759,6 +1761,15 @@ function randomPlate(prefix) {
 	}
 	let letter = () => "ABCDEFGHJKLMNPRSTUVWXYZ"[Math.floor(Math.random() * 23)] ?? "A";
 	return `${digit()}${digit()}${letter()}${letter()}${letter()}${digit()}${digit()}${digit()}`;
+}
+// ../../../packages/lib/src/server/vehicle/spawn.ts
+async function seatPlayer(vehicle, source, seat) {
+	let ped = GetPlayerPed(String(source));
+	return ped ? waitFor(() => {
+		if (!DoesEntityExist(vehicle)) return !1;
+		if (GetPedInVehicleSeat(vehicle, seat) === ped) return !0;
+		SetPedIntoVehicle(ped, vehicle, seat);
+	}, 2e3, 150).catch(() => !1) : !1;
 }
 async function spawnVehicle(options) {
 	let type = options.asker === void 0 ? options.type ?? "automobile" : await vehicleType(options.model, options.asker);
@@ -1781,6 +1792,14 @@ async function spawnVehicle(options) {
 	}], ...options.seats ?? []];
 	return await Promise.all(riders.map((r) => seatPlayer(vehicle, r.source, r.seat))), vehicle;
 }
+// ../../../packages/lib/src/server/netEntity.ts
+function entityFromNet(netId, type) {
+	if (readId(netId) === null) return 0;
+	let entity = NetworkGetEntityFromNetworkId(netId);
+	return !entity || !DoesEntityExist(entity) ? 0 : type === void 0 || GetEntityType(entity) === type ? entity : 0;
+}
+const vehicleFromNet = (netId) => entityFromNet(netId, 2), pedFromNet = (netId) => entityFromNet(netId, 1);
+// ../../../packages/lib/src/server/vehicle/nearby.ts
 function nearestVehicleAt(point, metres, filter) {
 	let best = 0, bestDistance = metres;
 	for (let vehicle of GetAllVehicles()) {
@@ -1799,12 +1818,6 @@ function nearestVehicleTo(source, metres, filter) {
 	}
 	return best;
 }
-function entityFromNet(netId, type) {
-	if (readId(netId) === null) return 0;
-	let entity = NetworkGetEntityFromNetworkId(netId);
-	return !entity || !DoesEntityExist(entity) ? 0 : type === void 0 || GetEntityType(entity) === type ? entity : 0;
-}
-const vehicleFromNet = (netId) => entityFromNet(netId, 2), pedFromNet = (netId) => entityFromNet(netId, 1);
 function vehicleNearPlayer(source, netId, options = {}) {
 	let vehicle = vehicleFromNet(netId);
 	if (!vehicle) return 0;
@@ -1943,22 +1956,13 @@ function onCharacter(handlers) {
 		}
 	});
 }
-// ../../../packages/lib/src/server/areaStream.ts
-var AreaStream = class {
-	options;
+// ../../../packages/lib/src/server/areaStream/grid.ts
+var AreaGrid = class {
 	items = new Map();
 	cells = new Map();
-	followers = new PlayerMap({ onDrop: (source, f) => this.leave(source, f) });
-	inCell = new Map();
-	alsoOf = new PlayerMap({ onDrop: (_source, entries) => {
-		for (let entry of entries) entry.also = void 0;
-	} });
 	size_;
-	range;
-	chunk;
-	stale = !1;
-	constructor(options) {
-		this.options = options, this.size_ = options.cellSize ?? 64, this.range = options.range ?? 1, this.chunk = options.chunk ?? 50;
+	constructor(cellSize) {
+		this.size_ = cellSize;
 	}
 	get size() {
 		return this.items.size;
@@ -1980,49 +1984,25 @@ var AreaStream = class {
 		let { cx, cy } = this.cellOf(x, y);
 		for (let dx = -cells; dx <= cells; dx++) for (let dy = -cells; dy <= cells; dy++) for (let entry of this.cells.get(cellKey(cx + dx, cy + dy)) ?? []) yield entry.item;
 	}
-	set(item, resend = !0) {
-		this.stale && this.followAll();
-		let { cx, cy } = this.cellOf(item.x, item.y), also = this.options.alsoTo?.(item), entry = this.items.get(item.id);
-		if (!entry) {
-			let fresh = {
-				item,
-				cx,
-				cy,
-				also: void 0
-			};
-			this.items.set(item.id, fresh), this.file(fresh), this.setAlso(fresh, also);
-			let put = [this.options.view(item)];
-			for (let source of this.who(cx, cy, also)) this.send(source, put, []);
-			return;
-		}
-		let before = this.who(entry.cx, entry.cy, entry.also);
-		(entry.cx !== cx || entry.cy !== cy) && (this.unfile(entry), entry.cx = cx, entry.cy = cy, this.file(entry)), entry.item = item, this.setAlso(entry, also);
-		let after = this.who(cx, cy, also), gone = [item.id];
-		for (let source of before) after.has(source) || this.send(source, [], gone);
-		let put = [this.options.view(item)];
-		for (let source of after) (resend || !before.has(source)) && this.send(source, put, []);
+	file(entry) {
+		let key = cellKey(entry.cx, entry.cy), set = this.cells.get(key);
+		set || this.cells.set(key, set = new Set()), set.add(entry);
 	}
-	delete(id) {
-		let entry = this.items.get(id);
-		if (!entry) return;
-		this.items.delete(id), this.unfile(entry);
-		let gone = [id];
-		for (let source of this.who(entry.cx, entry.cy, entry.also)) this.send(source, [], gone);
-		this.setAlso(entry, void 0);
+	unfile(entry) {
+		let key = cellKey(entry.cx, entry.cy), set = this.cells.get(key);
+		set?.delete(entry), set?.size === 0 && this.cells.delete(key);
 	}
-	load(items) {
-		for (let item of items) {
-			let old = this.items.get(item.id);
-			old && (this.unfile(old), this.setAlso(old, void 0));
-			let { cx, cy } = this.cellOf(item.x, item.y), entry = {
-				item,
-				cx,
-				cy,
-				also: void 0
-			};
-			this.items.set(item.id, entry), this.file(entry), this.setAlso(entry, this.options.alsoTo?.(item));
-		}
-		for (let [source, f] of this.followers) this.snapshot(source, f);
+}, AreaFollowers = class extends AreaGrid {
+	options;
+	followers = new PlayerMap({ onDrop: (source, f) => this.leave(source, f) });
+	inCell = new Map();
+	alsoOf = new PlayerMap({ onDrop: (_source, entries) => {
+		for (let entry of entries) entry.also = void 0;
+	} });
+	range;
+	chunk;
+	constructor(options) {
+		super(options.cellSize ?? 64), this.options = options, this.range = options.range ?? 1, this.chunk = options.chunk ?? 50;
 	}
 	recipients(id) {
 		let entry = this.items.get(id);
@@ -2034,44 +2014,6 @@ var AreaStream = class {
 		if (entry.also === source) return !0;
 		let f = this.followers.get(source);
 		return f !== void 0 && Math.abs(f.cx - entry.cx) <= this.range && Math.abs(f.cy - entry.cy) <= this.range;
-	}
-	start(source, at = coordsOf(source)) {
-		let { cx, cy } = this.cellOf(at.x, at.y), old = this.followers.get(source);
-		old && this.leave(source, old);
-		let f = {
-			cx,
-			cy
-		};
-		this.followers.set(source, f), this.enter(source, f), this.snapshot(source, f);
-	}
-	follow(source, cx, cy) {
-		let f = this.followers.get(source);
-		if (!f) {
-			let fresh = {
-				cx,
-				cy
-			};
-			return this.followers.set(source, fresh), this.enter(source, fresh), this.snapshot(source, fresh);
-		}
-		this.move(source, f, cx, cy);
-	}
-	followReported(source, cx, cy) {
-		let p = coordsOf(source), real = this.cellOf(p.x, p.y);
-		return Math.abs(real.cx - cx) > 1 || Math.abs(real.cy - cy) > 1 ? !1 : (this.follow(source, cx, cy), !0);
-	}
-	followAll() {
-		if (this.items.size === 0) this.stale = !0;
-		else {
-			this.stale = !1;
-			for (let [source, f] of this.followers) {
-				let p = coordsOf(source), { cx, cy } = this.cellOf(p.x, p.y);
-				this.move(source, f, cx, cy);
-			}
-		}
-	}
-	stop(source, tell = !1) {
-		let f = this.followers.get(source);
-		f && (this.followers.delete(source), this.leave(source, f), tell && this.emit(source, !0, [], []));
 	}
 	following(source) {
 		return this.followers.has(source);
@@ -2116,14 +2058,6 @@ var AreaStream = class {
 		let set = this.alsoOf.get(also);
 		set || this.alsoOf.set(also, set = new Set()), set.add(entry);
 	}
-	file(entry) {
-		let key = cellKey(entry.cx, entry.cy), set = this.cells.get(key);
-		set || this.cells.set(key, set = new Set()), set.add(entry);
-	}
-	unfile(entry) {
-		let key = cellKey(entry.cx, entry.cy), set = this.cells.get(key);
-		set?.delete(entry), set?.size === 0 && this.cells.delete(key);
-	}
 	enter(source, f) {
 		let key = cellKey(f.cx, f.cy), set = this.inCell.get(key);
 		set || this.inCell.set(key, set = new Set()), set.add(source);
@@ -2131,6 +2065,90 @@ var AreaStream = class {
 	leave(source, f) {
 		let key = cellKey(f.cx, f.cy), set = this.inCell.get(key);
 		set?.delete(source), set?.size === 0 && this.inCell.delete(key);
+	}
+}, AreaStream = class extends AreaFollowers {
+	stale = !1;
+	set(item, resend = !0) {
+		this.stale && this.followAll();
+		let { cx, cy } = this.cellOf(item.x, item.y), also = this.options.alsoTo?.(item), entry = this.items.get(item.id);
+		if (!entry) {
+			let fresh = {
+				item,
+				cx,
+				cy,
+				also: void 0
+			};
+			this.items.set(item.id, fresh), this.file(fresh), this.setAlso(fresh, also);
+			let put = [this.options.view(item)];
+			for (let source of this.who(cx, cy, also)) this.send(source, put, []);
+			return;
+		}
+		let before = this.who(entry.cx, entry.cy, entry.also);
+		(entry.cx !== cx || entry.cy !== cy) && (this.unfile(entry), entry.cx = cx, entry.cy = cy, this.file(entry)), entry.item = item, this.setAlso(entry, also);
+		let after = this.who(cx, cy, also), gone = [item.id];
+		for (let source of before) after.has(source) || this.send(source, [], gone);
+		let put = [this.options.view(item)];
+		for (let source of after) (resend || !before.has(source)) && this.send(source, put, []);
+	}
+	delete(id) {
+		let entry = this.items.get(id);
+		if (!entry) return;
+		this.items.delete(id), this.unfile(entry);
+		let gone = [id];
+		for (let source of this.who(entry.cx, entry.cy, entry.also)) this.send(source, [], gone);
+		this.setAlso(entry, void 0);
+	}
+	load(items) {
+		for (let item of items) {
+			let old = this.items.get(item.id);
+			old && (this.unfile(old), this.setAlso(old, void 0));
+			let { cx, cy } = this.cellOf(item.x, item.y), entry = {
+				item,
+				cx,
+				cy,
+				also: void 0
+			};
+			this.items.set(item.id, entry), this.file(entry), this.setAlso(entry, this.options.alsoTo?.(item));
+		}
+		for (let [source, f] of this.followers) this.snapshot(source, f);
+	}
+	start(source, at = coordsOf(source)) {
+		let { cx, cy } = this.cellOf(at.x, at.y), old = this.followers.get(source);
+		old && this.leave(source, old);
+		let f = {
+			cx,
+			cy
+		};
+		this.followers.set(source, f), this.enter(source, f), this.snapshot(source, f);
+	}
+	follow(source, cx, cy) {
+		let f = this.followers.get(source);
+		if (!f) {
+			let fresh = {
+				cx,
+				cy
+			};
+			return this.followers.set(source, fresh), this.enter(source, fresh), this.snapshot(source, fresh);
+		}
+		this.move(source, f, cx, cy);
+	}
+	followReported(source, cx, cy) {
+		let p = coordsOf(source), real = this.cellOf(p.x, p.y);
+		return Math.abs(real.cx - cx) > 1 || Math.abs(real.cy - cy) > 1 ? !1 : (this.follow(source, cx, cy), !0);
+	}
+	followAll() {
+		if (this.items.size === 0) this.stale = !0;
+		else {
+			this.stale = !1;
+			for (let [source, f] of this.followers) {
+				let p = coordsOf(source), { cx, cy } = this.cellOf(p.x, p.y);
+				this.move(source, f, cx, cy);
+			}
+		}
+	}
+	stop(source, tell = !1) {
+		let f = this.followers.get(source);
+		f && (this.followers.delete(source), this.leave(source, f), tell && this.emit(source, !0, [], []));
 	}
 }, PendingActions = class {
 	actions = new PlayerMap();
@@ -2243,8 +2261,7 @@ async function minigameFor(source, options) {
 	}, startedAt = GetGameTimer(), answer = await triggerClientCallback(LIB_UI.minigameForCallback, source, [request], 12e4).catch(() => null);
 	return answer === !0 || answer === "opened" ? GetGameTimer() - startedAt < (options.minMs ?? 0) ? "lost" : "won" : answer === "broken" ? "broken" : "lost";
 }
-// ../../../packages/lib/src/server/command.ts
-const resource$3 = GetCurrentResourceName(), log$3 = createLogger(resource$3);
+const log$3 = createLogger(GetCurrentResourceName());
 let texts = null;
 const t = (key, ...args) => formatText((texts ??= loadLocaleTexts(CORE.resource))[key] ?? key, args);
 function reply(source, text, kind) {
@@ -2310,7 +2327,8 @@ var Command = class {
 		return args;
 	}
 };
-const commands = new class {
+// ../../../packages/lib/src/server/command/commandSet.ts
+const resource$3 = GetCurrentResourceName(), commands = new class {
 	list = [];
 	sent = new Map();
 	announced = 0;
@@ -2336,6 +2354,7 @@ const commands = new class {
 		});
 	}
 }();
+// ../../../packages/lib/src/server/command/addCommand.ts
 function addCommand(name, options, handler) {
 	let names = (Array.isArray(name) ? name : [name]).map((n) => n.toLowerCase());
 	if (names.length === 0) throw Error("addCommand needs a name");
@@ -16741,47 +16760,8 @@ var ByResource = class {
 	}
 };
 const plateOf = (vehicle) => GetVehicleNumberPlateText(vehicle).trim().toUpperCase();
-let log = null;
-var ScheduledJob = class {
-	interval;
-	fn;
-	name;
-	gen = 0;
-	active = !1;
-	stopped = !1;
-	quietUntil = 0;
-	skipped = 0;
-	constructor(interval, fn, name) {
-		this.interval = interval, this.fn = fn, this.name = name;
-	}
-	get running() {
-		return this.active;
-	}
-	set(active) {
-		active === this.active || active && this.stopped || (this.active = active, active ? scheduler.activate(this) : scheduler.deactivate(this));
-	}
-	stop() {
-		this.set(!1), this.stopped = !0;
-	}
-	call() {
-		try {
-			let result = this.fn();
-			result instanceof Promise && result.catch((error) => this.fail(error));
-		} catch (error) {
-			this.fail(error);
-		}
-	}
-	fail(error) {
-		let now = GetGameTimer();
-		if (now < this.quietUntil) {
-			this.skipped++;
-			return;
-		}
-		this.quietUntil = now + 1e4;
-		let more = this.skipped ? ` (+${this.skipped} more)` : "";
-		this.skipped = 0, log ??= createLogger(GetCurrentResourceName()), log.error(`job "${this.name}" failed${more}`, error instanceof Error ? error.stack ?? error.message : error);
-	}
-}, Group = class {
+// ../../../packages/lib/src/fivem/scheduler/group.ts
+var Group = class {
 	interval;
 	jobs = Array(8);
 	gens = Array(8).fill(0);
@@ -16867,12 +16847,53 @@ const scheduler = new class {
 		groups.length = kept, this.nextDue = soonest;
 	};
 }();
+let log = null;
+var ScheduledJob = class {
+	interval;
+	fn;
+	name;
+	gen = 0;
+	active = !1;
+	stopped = !1;
+	quietUntil = 0;
+	skipped = 0;
+	constructor(interval, fn, name) {
+		this.interval = interval, this.fn = fn, this.name = name;
+	}
+	get running() {
+		return this.active;
+	}
+	set(active) {
+		active === this.active || active && this.stopped || (this.active = active, active ? scheduler.activate(this) : scheduler.deactivate(this));
+	}
+	stop() {
+		this.set(!1), this.stopped = !0;
+	}
+	call() {
+		try {
+			let result = this.fn();
+			result instanceof Promise && result.catch((error) => this.fail(error));
+		} catch (error) {
+			this.fail(error);
+		}
+	}
+	fail(error) {
+		let now = GetGameTimer();
+		if (now < this.quietUntil) {
+			this.skipped++;
+			return;
+		}
+		this.quietUntil = now + 1e4;
+		let more = this.skipped ? ` (+${this.skipped} more)` : "";
+		this.skipped = 0, log ??= createLogger(GetCurrentResourceName()), log.error(`job "${this.name}" failed${more}`, error instanceof Error ? error.stack ?? error.message : error);
+	}
+};
 function every(ms, fn, options = {}) {
 	let job = new ScheduledJob(Math.max(0, Math.floor(ms)), fn, options.name ?? (fn.name || "anonymous"));
 	return options.active !== !1 && job.set(!0), job;
 }
-// ../../../packages/lib/src/fivem/state.ts
-const stateNumber = (v) => typeof v == "number" && Number.isFinite(v) ? v : void 0, stateBoolean = (v) => typeof v == "boolean" ? v : void 0, stateString = (v) => typeof v == "string" ? v : void 0, isServer = IsDuplicityVersion();
+// ../../../packages/lib/src/fivem/state/mirror.ts
+const stateNumber = (v) => typeof v == "number" && Number.isFinite(v) ? v : void 0, stateBoolean = (v) => typeof v == "boolean" ? v : void 0, stateString = (v) => typeof v == "string" ? v : void 0;
 var Mirror = class {
 	key;
 	parse;
@@ -16891,14 +16912,17 @@ var Mirror = class {
 		let old = this.values.get(id);
 		if (this.values.set(id, value), old !== value) for (let listener of this.listeners) listener(id, value, old);
 	}
-}, EntityState$1 = class extends Mirror {
+};
+// ../../../packages/lib/src/fivem/state/entityState.ts
+const isServer$1 = IsDuplicityVersion();
+var EntityState$1 = class extends Mirror {
 	handles = new Map();
 	constructor(key, parse) {
 		super(key, parse), AddStateBagChangeHandler(key, "", (bag, _key, value) => {
 			if (!bag.startsWith("entity:")) return;
 			let netId = Number(bag.slice(7));
 			this.handles.set(netId, GetEntityFromStateBagName(bag)), this.store(netId, value);
-		}), isServer ? on("entityRemoved", (entity) => this.forget(NetworkGetNetworkIdFromEntity(entity))) : every(3e4, () => this.prune(), { name: `state ${key}` });
+		}), isServer$1 ? on("entityRemoved", (entity) => this.forget(NetworkGetNetworkIdFromEntity(entity))) : every(3e4, () => this.prune(), { name: `state ${key}` });
 	}
 	get(entity) {
 		if (!entity) return;
@@ -16924,38 +16948,6 @@ var Mirror = class {
 	}
 	prune() {
 		for (let netId of this.values.keys()) DoesEntityExist(NetworkGetEntityFromNetworkId(netId)) || this.forget(netId);
-	}
-};
-const playerStates = new Set();
-let dropListener = !1;
-var PlayerState$1 = class extends Mirror {
-	seen = new Set();
-	constructor(key, parse) {
-		super(key, parse), AddStateBagChangeHandler(key, "", (bag, _key, value) => {
-			if (!bag.startsWith("player:")) return;
-			let id = Number(bag.slice(7));
-			this.seen.add(id), this.store(id, value);
-		}), isServer && (playerStates.add(this), dropListener || (dropListener = !0, on("playerDropped", () => {
-			let id = Number(globalThis.source);
-			for (let state of playerStates) state.dropPlayer(id);
-		})));
-	}
-	dropPlayer(serverId) {
-		this.forget(serverId);
-	}
-	get(serverId) {
-		if (!this.seen.has(serverId)) {
-			this.seen.add(serverId);
-			let raw = Player(serverId).state[this.key];
-			this.values.set(serverId, raw == null ? void 0 : this.parse(raw));
-		}
-		return this.values.get(serverId);
-	}
-	put(serverId, value) {
-		this.seen.add(serverId), this.apply(serverId, value);
-	}
-	forget(serverId) {
-		this.values.delete(serverId), this.seen.delete(serverId);
 	}
 }, GlobalKey$1 = class extends Mirror {
 	constructor(key, parse) {
@@ -16998,6 +16990,39 @@ var GlobalGroup$1 = class extends Mirror {
 	}
 	ids() {
 		return this.values.keys();
+	}
+};
+// ../../../packages/lib/src/fivem/state/playerState.ts
+const isServer = IsDuplicityVersion(), playerStates = new Set();
+let dropListener = !1;
+var PlayerState$1 = class extends Mirror {
+	seen = new Set();
+	constructor(key, parse) {
+		super(key, parse), AddStateBagChangeHandler(key, "", (bag, _key, value) => {
+			if (!bag.startsWith("player:")) return;
+			let id = Number(bag.slice(7));
+			this.seen.add(id), this.store(id, value);
+		}), isServer && (playerStates.add(this), dropListener || (dropListener = !0, on("playerDropped", () => {
+			let id = Number(globalThis.source);
+			for (let state of playerStates) state.dropPlayer(id);
+		})));
+	}
+	dropPlayer(serverId) {
+		this.forget(serverId);
+	}
+	get(serverId) {
+		if (!this.seen.has(serverId)) {
+			this.seen.add(serverId);
+			let raw = Player(serverId).state[this.key];
+			this.values.set(serverId, raw == null ? void 0 : this.parse(raw));
+		}
+		return this.values.get(serverId);
+	}
+	put(serverId, value) {
+		this.seen.add(serverId), this.apply(serverId, value);
+	}
+	forget(serverId) {
+		this.values.delete(serverId), this.seen.delete(serverId);
 	}
 }, EntityState = class extends EntityState$1 {
 	set(entity, value) {
@@ -17113,8 +17138,11 @@ const core$17 = resourceExport(CORE.resource), world = {
 		core$1.BanPlayer(target, reason, minutes, by, resolve) || resolve(null);
 	}),
 	unban: (banId, by) => core$1.UnbanPlayer(banId, by),
+	edit: (banId, edit, by) => core$1.EditBan(banId, edit, by),
 	isBanned: (target) => core$1.IsBanned(target),
-	list: (page = 1) => core$1.GetBans(page)
+	list: (page = 1) => core$1.GetBans(page),
+	history: (target) => new Promise((resolve) => core$1.GetBanHistory(target, resolve)),
+	search: (query) => new Promise((resolve) => core$1.ListBans(query, resolve))
 }, core = resourceExport(CORE.resource), isPrimeTime = (job) => core.IsPrimeTime(job);
 // ../../../packages/lib/src/server/index.ts
 var server_exports = __exportAll({
@@ -17237,7 +17265,7 @@ function sendPlayerData(source, key, value) {
 function patchPlayerData(source, key, patch) {
 	emitNet("ai-core:client:playerDataPatch", source, key, patch);
 }
-// resource/server/index.ts
+// resource/server/aiLib.ts
 Object.assign(globalThis, { aiLib: {
 	...shared_exports,
 	...server_exports

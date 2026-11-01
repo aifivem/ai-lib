@@ -41,7 +41,8 @@
   "fxFiles": [
     "init.lua",
     "lua/shared/*.lua",
-    "lua/client/*.lua"
+    "lua/client/*.lua",
+    "lua/client/*/*.lua"
   ],
   "fxClientScripts": [
     "dist/ui.js"

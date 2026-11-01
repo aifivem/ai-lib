@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import { config } from "@fortawesome/fontawesome-svg-core";
 import { applyPreview } from "./dev/preview";
 import { Dialogs } from "./features/dialogs/Dialogs";
-import { Minigames } from "./features/dialogs/Minigames";
+import { Minigames } from "./features/minigames/Minigames";
 import { Notifications } from "./features/notify/Notifications";
 import { Prompts } from "./features/prompts/Prompts";
 import "./index.css";

@@ -1592,6 +1592,7 @@ const core$24 = resourceExport(CORE.resource), inventory = {
 	registerShop: (name, label, items) => core$24.RegisterShop(name, label, items),
 	openShop: (source, name) => core$24.OpenShop(source, name),
 	getItemDefinition: (name) => core$24.GetItemDefinition(name),
+	getItemDefinitions: () => core$24.GetItemDefinitions() ?? {},
 	setItemMetadata: (inv, slot, metadata) => core$24.SetItemMetadata(inv, slot, metadata),
 	setMaxWeight: (source, grams) => core$24.SetMaxWeight(source, grams),
 	usableItems: () => core$24.GetUsableItems()

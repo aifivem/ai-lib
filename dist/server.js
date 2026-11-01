@@ -17137,7 +17137,10 @@ const core$18 = resourceExport(CORE.resource), world = {
 	gain: (source, amount) => amount > 0 && core$5.AddStress(source, amount),
 	relieve: (source, amount) => amount > 0 && core$5.AddStress(source, -amount),
 	provider: () => core$5.GetStressSystem()
-}, needs = { refill: (source) => core$5.RefillNeeds(source) }, core$4 = resourceExport(CORE.resource), doors = {
+}, needs = {
+	refill: (source) => core$5.RefillNeeds(source),
+	add: (source, need, amount) => core$5.AddNeed(source, need, amount)
+}, core$4 = resourceExport(CORE.resource), doors = {
 	setLocked: (id, locked, by) => core$4.SetDoorLocked(id, locked, by),
 	isLocked: (id) => core$4.IsDoorLocked(id),
 	provider: () => core$4.GetDoorlockSystem()

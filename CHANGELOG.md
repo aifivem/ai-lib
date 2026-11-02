@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/aifivem/ai-lib/compare/v0.4.0...v0.5.0) (2026-11-02)
+
+
+### New Features
+
+* **lua:** online jobCount, jobPlayers and onJobState from a job mirror ([4b99991](https://github.com/aifivem/ai-lib/commit/4b999915a5c145b430d8b13694fef271d91650d6))
+
 ## [0.4.0](https://github.com/aifivem/ai-lib/compare/v0.3.0...v0.4.0) (2026-11-01)
 
 

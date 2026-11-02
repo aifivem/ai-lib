@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.5.1](https://github.com/aifivem/ai-lib/compare/v0.5.0...v0.5.1) (2026-11-02)
+
+
+### Bug Fixes
+
+* **build:** keep the web build in dist/ so release zips have the NUI ([d234af0](https://github.com/aifivem/ai-lib/commit/d234af00cc2a4e614999269c7d044ff83c3ed2ea))
+
+
+### Code Refactoring
+
+* import the shared packages from [@aifivem](https://github.com/aifivem) ([5e1e9df](https://github.com/aifivem/ai-lib/commit/5e1e9df388a7f8625d6dce94f0da45613234164b))
+
 ## [0.5.0](https://github.com/aifivem/ai-lib/compare/v0.4.0...v0.5.0) (2026-11-02)
 
 

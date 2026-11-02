@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.6.0](https://github.com/aifivem/ai-lib/compare/v0.5.2...v0.6.0) (2026-11-02)
+
+
+### New Features
+
+* **lua:** add aiLib.illegal and aiLib.mdt.hasWarrant ([0f543a9](https://github.com/aifivem/ai-lib/commit/0f543a913017aa885317f39f0c758da45bc13a11))
+* **lua:** add aiLib.needs.set ([f002a08](https://github.com/aifivem/ai-lib/commit/f002a0860d9f1136a5861f90d006fd9ada842c5e))
+* **lua:** add aiLib.phone.onUsed ([9d64848](https://github.com/aifivem/ai-lib/commit/9d648485a8ffe8e16bec594ed3f90b9b8f03f940))
+
 ## [0.5.2](https://github.com/aifivem/ai-lib/compare/v0.5.1...v0.5.2) (2026-11-02)
 
 

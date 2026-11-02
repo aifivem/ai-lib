@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.5.2](https://github.com/aifivem/ai-lib/compare/v0.5.1...v0.5.2) (2026-11-02)
+
+
+### Documentation
+
+* install from the release zip ([d30b7c7](https://github.com/aifivem/ai-lib/commit/d30b7c75bafc404f148084026d0e4f5ff9bcea8c))
+
+
+### Miscellaneous Chores
+
+* build files are no longer in git, the release zip carries them ([e40e574](https://github.com/aifivem/ai-lib/commit/e40e57493a698ef60dcba53c9a652815feea8355))
+
 ## [0.5.1](https://github.com/aifivem/ai-lib/compare/v0.5.0...v0.5.1) (2026-11-02)
 
 

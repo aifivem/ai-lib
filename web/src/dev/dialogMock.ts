@@ -1,4 +1,4 @@
-import type { MenuRequest } from "@aicore-fivem/shared";
+import type { MenuRequest } from "@aifivem/shared";
 import type { MinigameMessage } from "../features/minigames/types";
 
 /** Browser preview only: `?view=menu` shows a job menu. */

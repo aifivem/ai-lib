@@ -1,4 +1,4 @@
-import { controls } from "@aicore-fivem/lib/client";
+import { controls } from "@aifivem/lib/client";
 
 /**
  * Escape closes the dialogs: the game must not open the pause menu with the same key press once the focus is gone.

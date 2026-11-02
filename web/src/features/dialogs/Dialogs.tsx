@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNuiEvent } from "fivem-nui-react";
-import type { InputRequest, MenuRequest } from "@aicore-fivem/shared";
+import type { InputRequest, MenuRequest } from "@aifivem/shared";
 import { NuiMessage } from "../../../../resource/common/nui";
 import { MENU_MOCK } from "../../dev/dialogMock";
 import { InputPanel } from "./InputPanel";

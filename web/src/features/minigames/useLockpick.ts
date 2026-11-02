@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { LockpickResult } from "@aicore-fivem/shared";
+import type { LockpickResult } from "@aifivem/shared";
 import { answer } from "../../lib/dialogAnswer";
 
 const MOVE_SPEED = 90;

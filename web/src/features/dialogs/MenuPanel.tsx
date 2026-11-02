@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { fetchNui } from "fivem-nui-react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import type { MenuRequest } from "@aicore-fivem/shared";
+import type { MenuRequest } from "@aifivem/shared";
 import { NuiCallback } from "../../../../resource/common/nui";
 import { answer } from "../../lib/dialogAnswer";
 import { iconOf } from "../../lib/icons";

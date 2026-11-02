@@ -2,7 +2,7 @@
   "name": "ai-lib",
   "version": "0.5.0",
   "private": true,
-  "description": "The shared player UI (notifications, progress bar, prompts, menus, inputs, minigames) and the @aicore-fivem/lib helpers for resources that do not bundle it: @ai-lib/init.lua (Lua) or @ai-lib/dist/client.js / server.js (JavaScript)",
+  "description": "The shared player UI (notifications, progress bar, prompts, menus, inputs, minigames) and the @aifivem/lib helpers for resources that do not bundle it: @ai-lib/init.lua (Lua) or @ai-lib/dist/client.js / server.js (JavaScript)",
   "license": "GPL-3.0-only",
   "author": {
     "name": "TGIANN"
@@ -21,11 +21,11 @@
     "webdev": "bun --cwd web vite"
   },
   "dependencies": {
-    "@aicore-fivem/lib": "workspace:*",
-    "@aicore-fivem/shared": "workspace:*"
+    "@aifivem/lib": "workspace:*",
+    "@aifivem/shared": "workspace:*"
   },
   "devDependencies": {
-    "@aicore-fivem/build": "workspace:*",
+    "@aifivem/build": "workspace:*",
     "@citizenfx/client": "latest",
     "@citizenfx/server": "latest",
     "@types/bun": "latest",

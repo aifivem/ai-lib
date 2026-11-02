@@ -4,14 +4,14 @@ import {
   Keybind,
   optionalExport,
   registerExport,
-} from "@aicore-fivem/lib/client";
+} from "@aifivem/lib/client";
 import {
   isRecord,
   logSafe,
   readVec3,
   type Vec3,
-} from "@aicore-fivem/lib/shared";
-import { LIB_UI } from "@aicore-fivem/shared";
+} from "@aifivem/lib/shared";
+import { LIB_UI } from "@aifivem/shared";
 import Locale from "common/locale";
 import { NuiMessage } from "common/nui";
 

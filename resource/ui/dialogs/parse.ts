@@ -1,10 +1,10 @@
-import { isRecord, logSafe } from "@aicore-fivem/lib/shared";
+import { isRecord, logSafe } from "@aifivem/lib/shared";
 import type {
   InputField,
   InputRequest,
   MenuItem,
   MenuRequest,
-} from "@aicore-fivem/shared";
+} from "@aifivem/shared";
 
 export function toMenu(v: unknown): MenuRequest | null {
   if (!isRecord(v) || typeof v.title !== "string" || !Array.isArray(v.items))

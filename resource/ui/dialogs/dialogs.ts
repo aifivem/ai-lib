@@ -1,4 +1,4 @@
-import { MENU_EVENTS } from "@aicore-fivem/shared";
+import { MENU_EVENTS } from "@aifivem/shared";
 import { NuiMessage } from "common/nui";
 import { pauseGuard } from "./pauseGuard";
 

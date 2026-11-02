@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { MENU_BACK, type MenuRequest } from "@aicore-fivem/shared";
+import { MENU_BACK, type MenuRequest } from "@aifivem/shared";
 import { answer } from "../../lib/dialogAnswer";
 
 /** Holding Escape this long closes the whole menu flow. */

@@ -1,6 +1,6 @@
 # ai-lib
 
-The shared player UI (notifications, progress bar, prompts, menus, inputs, minigames) and the @aicore-fivem/lib helpers for resources that do not bundle it: @ai-lib/init.lua (Lua) or @ai-lib/dist/client.js / server.js (JavaScript).
+The shared player UI (notifications, progress bar, prompts, menus, inputs, minigames) and the @aifivem/lib helpers for resources that do not bundle it: @ai-lib/init.lua (Lua) or @ai-lib/dist/client.js / server.js (JavaScript).
 
 Part of [AI Core](https://aifivem.com): a TypeScript FiveM framework where every script is configured in one in-game admin panel, and ESX, QBCore and Qbox scripts run unchanged.
 
